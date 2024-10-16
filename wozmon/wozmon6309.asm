@@ -4,7 +4,7 @@ STL     = $26
 STH     = $27
 L       = $28
 H       = $29
-YSAV    = $2A
+XSAV    = $2A
 MODE    = $2C
 
 IN      = $0200
@@ -15,6 +15,8 @@ CTRL    = $c303
 
         ORG $FF00
 RESET:  orcc #$50
+        lds #$0100
+        tfr 0,dp
         lda #$1f
         sta CTRL
         lda #$0b
@@ -23,31 +25,30 @@ NOTCR:  cmpa #'_'+$80
         beq BACKSPACE
         cmpa #$9b
         beq ESCAPE
-        cmpy #$0080
+        cmpx #$0080
         bmi NEXTCHAR
 ESCAPE: lda #'\'+$80
         jsr ECHO
 GETLINE:lda #$8d
         jsr ECHO
-        ldy #$0001
-BACKSPACE:leay -1,y
-        cmpy #$0000
+        ldx #$0001
+BACKSPACE:leax -1,x
+        cmpx #$0000
         bmi GETLINE
 NEXTCHAR:lda STATUS
         anda #$08
         beq NEXTCHAR
         lda DATA
         ora #$80
-        sta IN,y+
+        sta IN,x+
         jsr ECHO
         cmpa #$8d
         bne NOTCR
-        ldy #$ffff
-        clrw
+        ldx #$ffff
         clra
 SETSTOR:asla
 SETMODE:sta MODE
-NEXTITEM:lda IN,y+
+NEXTITEM:lda IN,x+
         cmpa #$8d
         beq GETLINE
         cmpa #'.'+$80
@@ -57,8 +58,9 @@ NEXTITEM:lda IN,y+
         beq SETSTOR
         cmpa #'R'+$80
         beq RUN
-        stw L
-        sty YSAV
+        clr L
+        clr H
+        stx XSAV
 NEXTHEX:eora #$b0
         cmpa #$fa
         bcs DIG
@@ -75,27 +77,27 @@ HEXSHIFT:asla
         rol H
         decb
         bne HEXSHIFT
-        lda IN,y+
+        lda IN,x+
         bra NEXTHEX
-NOTHEX: cmpy YSAV
+NOTHEX: cmpx XSAV
         beq ESCAPE
         ldb MODE
         bitb #%01000000
         beq NOTSTOR
         lda L
         sta [STL]
-        ldx STL
-        leax 1,x
-        stx STL
+        ldd STL
+        incd
+        std STL
 TONEXTITEM:bra NEXTITEM
 RUN:    jmp [XAML]
 NOTSTOR:bitb #%10000000
         bne XAMNEXT
-        ldx #$0002
-SETADR: lda L-1,x
-        sta STL-1,x
-        sta XAML-1,x
-        leax -1,x
+        ldy #$0002
+SETADR: lda L-1,y
+        sta STL-1,y
+        sta XAML-1,y
+        leay -1,y
         bne SETADR
 NXTPRNT:bne PRDATA
         lda #$8d
@@ -110,32 +112,32 @@ PRDATA: lda #$a0
         jsr ECHO
         lda [XAML]
         jsr PRBYTE
-XAMNEXT:ste MODE
-        ldx XAML
-        cmpx L
+XAMNEXT:clr MODE
+        ldy XAML
+        cmpy L
         bcc TONEXTITEM
-        leax 1,x
-        stx XAML
-        tfr x,b
+        leay 1,y
+        sty XAML
+        tfr y,b
         andb #$0f
         bra NXTPRNT
-PRBYTE: sta ,-s
+PRBYTE: pshs a
         lsra
         lsra
         lsra
         lsra
         jsr PRHEX
-        lda ,s+
+        puls a
 PRHEX:  anda #$0f
         ora #'0'+$80
         cmpa #$ba
         bcs ECHO
         adda #$07
-ECHO:   sta ,-s
+ECHO:   pshs a
         anda #$7f
         sta DATA
 POLL:   lda STATUS
         anda #$10
         beq POLL
-        lda ,s+
+        puls a
         rts

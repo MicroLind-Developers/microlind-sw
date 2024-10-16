@@ -2,4 +2,5 @@
 *.ihex
 *.sym
 *.raw
+*.bin
 **/build/

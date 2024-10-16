@@ -10,10 +10,14 @@ MODE    = $2C
 IN      = $0200
 DATA    = $f7c3
 STATUS  = $f7c0
-CTRL    = $c303
-
-        ORG $FE00
+CTRL    = $f7c1
+        org $e000
+        fill $00,$1dff
+        org $FE00
 RESET:  orcc #$50
+        lds #$0100
+        clra
+        tfr a,dp
         lda #$7f
         sta STATUS
         lda #$0d
@@ -143,3 +147,5 @@ POLL:   lda STATUS
         beq POLL
         puls a
         rts
+
+        include boot.asm
