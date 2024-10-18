@@ -1,4 +1,4 @@
-        
+                
         * 65c22 at $f780*
 ORB_22  = $f780
 ORA_22  = $f781
@@ -37,3 +37,9 @@ IP_681  = $f7cd
 OPCD_681 = $f7cd
 SOP_681 = $f7ce
 COP_681 = $f7cf
+MMU0    = $f440
+
+        *MMU at $f440*
+MMU1    = $f441
+MMU2    = $f442
+MMU3    = $f443
