@@ -1,9 +1,9 @@
-XAML    = $24
-XAMH    = $25
-STL     = $26
-STH     = $27
-L       = $28
-H       = $29
+XAML    = $25
+XAMH    = $24
+STL     = $27
+STH     = $26
+L       = $29
+H       = $28
 YSAV    = $2A
 MODE    = $2C
 
@@ -28,6 +28,8 @@ NOTCR:  cmpa #'_'+$80
         beq BACKSPACE
         cmpa #$9b
         beq ESCAPE
+*        lda #'L'+$80    #
+*        jsr ECHO        #
         cmpy #$0080
         bmi NEXTCHAR
 ESCAPE: lda #'\'+$80
@@ -48,6 +50,8 @@ NEXTCHAR:lda STATUS
         jsr ECHO
         cmpa #$8d
         bne NOTCR
+*        lda #'E'+$80    #DEBUG#
+*        jsr ECHO        #DEBUG#
         ldy #$ffff
         clra
 SETSTOR:asla
@@ -86,17 +90,17 @@ HEXSHIFT:asla
         leay 1,y
         bra NEXTHEX
 NOTHEX: cmpy YSAV
-        beq ESCAPE
+        lbeq ESCAPE
         ldb MODE
         bitb #%01000000
         beq NOTSTOR
         lda L
-        sta [STL]
-        ldx STL
+        sta [STH]
+        ldx STH
         leax 1,x
-        stx STL
+        stx STH
 TONEXTITEM:bra NEXTITEM
-RUN:    jmp [XAML]
+RUN:    jmp [XAMH]
 NOTSTOR:bitb #%10000000
         bne XAMNEXT
         ldx #$0002
@@ -116,14 +120,14 @@ NXTPRNT:bne PRDATA
         jsr ECHO
 PRDATA: lda #$a0
         jsr ECHO
-        lda [XAML]
+        lda [XAMH]
         jsr PRBYTE
 XAMNEXT:clr MODE
-        ldx XAML
-        cmpx L
+        ldx XAMH
+        cmpx H
         bcc TONEXTITEM
         leax 1,x
-        stx XAML
+        stx XAMH
         tfr x,b
         andb #$0f
         bra NXTPRNT
