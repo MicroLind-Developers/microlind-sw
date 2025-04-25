@@ -1,0 +1,6 @@
+*.srec
+*.ihex
+*.sym
+*.raw
+*.bin
+**/build/
