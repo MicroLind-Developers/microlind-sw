@@ -11,7 +11,6 @@
 ; ---------------------------------------------------
 
 
-
 ; -----------------------------------------------------------------
 ; MEMORY_DUMP
 ; input:            X = start address (0x0000 - 0xFFFF)
@@ -72,7 +71,12 @@ _DUMP_END:
     jsr SERIAL_PRINT_A
     rts
 
-
+; -----------------------------------------------------------------
+; MEMORY_DUMP_BANK_SETTINGS
+; input:            None
+; output:           None
+; clobbers:         None
+; -----------------------------------------------------------------
 MEMORY_DUMP_BANK_SETTINGS:
     pshs X,A
     ldx #bank_header

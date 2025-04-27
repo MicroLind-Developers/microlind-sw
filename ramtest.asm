@@ -29,11 +29,6 @@ ramtest:
     ldx     ,s          ;Get area size
     beq     exitrt      ;Exit if area = 0
 
-    ;Fill memory with 0x00 and test
-    clra                ;Get zero value
-    bsr     filcmp      ;Fill and test memory
-    bcs     exitrt      ;Exit if errors
-
     ;Fill memory with 0xFF and test
     lda     #$FF        ;Get FF value
     bsr     filcmp      ;Fill and test memory
@@ -46,6 +41,11 @@ ramtest:
 
     ;Fill memory with 0xAA and test
     lda     #$AA        ;Get AA value (10101010)
+    bsr     filcmp      ;Fill and test memory
+    bcs     exitrt      ;Exit if errors
+
+    ;Fill memory with 0x00 and test
+    clra                ;Get zero value
     bsr     filcmp      ;Fill and test memory
     bcs     exitrt      ;Exit if errors
 
