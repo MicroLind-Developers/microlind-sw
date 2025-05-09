@@ -116,3 +116,7 @@ READ_JOY2:
         eora  #$FF
         anda   #%00011111
         rts
+
+PARALLEL_IRQ_HANDLER:
+        ; TODO: Handle IRQ here
+        rti

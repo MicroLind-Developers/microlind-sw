@@ -3,27 +3,36 @@
 ; -----------------------------------------------------------------
 ; Copyright Eric & Linus Lind 2024
 ;
-
-; Setup the default stack pointer to $1000
-STACK EQU $1000
-
+    ; INCLUDE "memory.inc"
     org $FF00
+
 HOOK_TRAP:
-    jmp HANG
+    
+
+HOOK_FIRQ:
+    ; jmp FIRQ_HANDLER
+
+HOOK_IRQ:
+    ; jmp IRQ_HANDLER
+
 HOOK_SWI3:
 HOOK_SWI2:
 HOOK_SWI:
-HOOK_FIRQ:
-HOOK_IRQ:
 HOOK_NMI:
 HOOK_RESET:
+    jmp INIT
 
 INIT:
     ; ---- CPU RESET ENTRY POINT ----
     ; Start by turning off interrupts
     orcc #$50       ;Turn off interupts
 
-    ; Initialize the CPU to native mode
+    jsr SET_LED_BLUE
+
+    ; lda #$F0
+    ; sta $f404       ; Disable IRQ handler
+
+    ; Initialize the CPU to native mode and complete stacking for FIRQ
     ldmd #$01
     
     ; Initialize the MMU, must be done first, therefore we use the
@@ -33,36 +42,42 @@ INIT:
     ; 0x4000 - 0x7FFF = bank 1 -> 0x004000
     ; 0x8000 - 0xBFFF = bank 2 -> 0x008000
     ; 0xC000 - 0xDFFF = bank 3 -> 0x00C000 (0xE000 - 0xFFFF = ROM)
-    lda #$19
-	sta MMU_REG_3
-	clra
-    sta MMU_REG_0
-    inca
-    sta MMU_REG_1
-    inca
-    sta MMU_REG_2
+    ; lda #$19
+	; sta $f403
+	; clra
+    ; sta $f400
+    ; inca
+    ; sta $f401
+    ; inca
+    ; sta $f402
+
+   
+    
 
     ; Set up the stack
-	lds #STACK
+	lds $E000
+
+   
 
     jsr CLEAR_REGS
+
+    
 
 	; Initialize the serial port
 	jsr SERIAL_INIT
     jsr SERIAL_START
 
-    jsr MEMORY_DUMP_BANK_SETTINGS
-
 	; Initialize the parallel port
-	jsr PARALLEL_INIT
+	;jsr PARALLEL_INIT
 
-	; Initialize the IRQ
-	jsr IRQ_INIT
+    ; Initialize the led to Blue
+   
 
-    ; Initialize the led to off
-    jsr SET_LED_GREEN
+    ldx #msg_init
+    jsr SERIAL_PRINT_A
 
-    lbra _START	
+    ; lbra _START
+    bra HANG	
 
 ; -----------------------------------------------------------------
 ; Infinite loop, used for debugging
@@ -87,6 +102,18 @@ CLEAR_REGS:
     tfr     d,v
     rts
 
+
+; ; ------------------------------------------------------------------
+; ; Dummy subroutine for anything
+; ; ------------------------------------------------------------------
+; DUMMY_SUBROUTINE:
+;     ; DO NOTHING!
+;     rts
+
+msg_init:
+    fcc "Initializing µLind..."
+    fcb 10,13,0
+
 ; -----------------------------------------------------------------
 ; Vector table for the CPU
 ; -----------------------------------------------------------------
@@ -101,6 +128,6 @@ V_SWI: fdb HOOK_SWI
 V_NMI: fdb HOOK_NMI
 V_RESET: fdb HOOK_RESET
 
-    org $FB00
+    ; org $FB00
 ; -----------------------------------------------------------------
 ; Rest of the code after this point

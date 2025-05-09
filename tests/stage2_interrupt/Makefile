@@ -1,7 +1,8 @@
 FORMAT = ihex
 BUILD = build
 
-INTERRUPT_SRC = ../../bios/init.asm  ../../driver/serial_xr88c92.asm ../../driver/mmu.asm ../../driver/led.asm ../../driver/parallel_6522.asm ../../driver/irq.asm ../../bios/memory.asm  interrupt.asm
+INTERRUPT_SRC = ../../driver/serial_xr88c92.asm	../../driver/led.asm ../../bios/init.asm
+
 INTERRUPT_OBJ = $(INTERRUPT_SRC:.asm=.o)
 INTERRUPT_BIN = $(BUILD)/interrupt.$(FORMAT)
 

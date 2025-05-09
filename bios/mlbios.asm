@@ -4,8 +4,12 @@
 ; Copyright Eric & Linus Lind 2024
 ;
 
+; Jumptable for BIOS functions
+; -----------------------------------------------------------------
+
+
 ; Variables
-BUFFER equ $C000
+BUFFER equ SERIAL_BUFFER_START
 BUFFER_SIZE equ $0F
 
 _START:

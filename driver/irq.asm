@@ -6,6 +6,23 @@
 
 IRQ_BASE           EQU $f404
 
+IRQ_JUMP_TABLE:
+    FDB SERIAL_IRQ_HANDLER
+    FDB _UNUSED_IRQ_
+    FDB _UNUSED_IRQ_
+    FDB _UNUSED_IRQ_
+    FDB EXPANSION_IRQ_HANDLER
+    FDB _UNUSED_IRQ_
+    FDB VIDEO_IRQ_HANDLER
+    FDB AUDIO_IRQ_HANDLER
+    FDB _UNUSED_IRQ_
+    FDB _UNUSED_IRQ_
+    FDB _UNUSED_IRQ_
+    FDB _UNUSED_IRQ_
+    FDB _UNUSED_IRQ_
+    FDB _UNUSED_IRQ_
+    FDB _UNUSED_IRQ_
+    FDB _ILLEGAL_IRQ_
 ; -----------------------------------------------------------------
 ; IRQ INIT
 ; input:            None
@@ -60,4 +77,30 @@ IRQ_GET_CURRENT_FILTER:
 
 ; Temporary FIRQ Handler
 FIRQ_HANDLER:
-        jmp FIRQ_ROUTINE
+       jsr IRQ_GET_ACTIVE
+       ldx IRQ_JUMP_TABLE
+       asla
+       jmp [a,x]
+
+IRQ_HANDLER:
+       jmp PARALLEL_IRQ_HANDLER
+
+_ILLEGAL_IRQ_:
+_UNUSED_IRQ_:
+    ;TODO: Tell user about the illegal IRQ
+       rti
+
+    IFNDEF VIDEO_IRQ_HANDLER
+VIDEO_IRQ_HANDLER:
+        rti 
+    ENDC
+
+    IFNDEF AUDIO_IRQ_HANDLER
+AUDIO_IRQ_HANDLER:
+       rti
+    ENDC
+
+    IFNDEF EXPANSION_IRQ_HANDLER
+EXPANSION_IRQ_HANDLER:
+       rti
+    ENDC
