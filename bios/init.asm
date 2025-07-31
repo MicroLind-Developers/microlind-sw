@@ -3,7 +3,7 @@
 ; -----------------------------------------------------------------
 ; Copyright Eric & Linus Lind 2024
 ;
-    ; INCLUDE "memory.inc"
+    INCLUDE "memory.inc"
     org $FF00
 
 HOOK_TRAP:
@@ -25,14 +25,13 @@ HOOK_RESET:
 INIT:
     ; ---- CPU RESET ENTRY POINT ----
     ; Start by turning off interrupts
-    orcc #$50       ;Turn off interupts
+    orcc #$50
+    
+    ; Disable IRQ handler
+    lda #$F0
+    sta $f404       
 
-    jsr SET_LED_BLUE
-
-    ; lda #$F0
-    ; sta $f404       ; Disable IRQ handler
-
-    ; Initialize the CPU to native mode and complete stacking for FIRQ
+    ; Initialize the CPU to native mode
     ldmd #$01
     
     ; Initialize the MMU, must be done first, therefore we use the
@@ -42,42 +41,37 @@ INIT:
     ; 0x4000 - 0x7FFF = bank 1 -> 0x004000
     ; 0x8000 - 0xBFFF = bank 2 -> 0x008000
     ; 0xC000 - 0xDFFF = bank 3 -> 0x00C000 (0xE000 - 0xFFFF = ROM)
-    ; lda #$19
-	; sta $f403
-	; clra
-    ; sta $f400
-    ; inca
-    ; sta $f401
-    ; inca
-    ; sta $f402
+    lda #$19
+	sta $f403
+	clra
+    sta $f400
+    inca
+    sta $f401
+    inca
+    sta $f402
 
-   
-    
+    ; Set up the VALUE of the stack pointer
+	lds #$E000
 
-    ; Set up the stack
-	lds $E000
-
-   
-
+    ; Clear all registers
     jsr CLEAR_REGS
-
-    
 
 	; Initialize the serial port
 	jsr SERIAL_INIT
     jsr SERIAL_START
 
 	; Initialize the parallel port
-	;jsr PARALLEL_INIT
+	; jsr PARALLEL_INIT
 
     ; Initialize the led to Blue
-   
+    jsr SET_LED_BLUE
 
+    ; Print the initialization message
+    ; This is a message that will be printed to the serial port
     ldx #msg_init
     jsr SERIAL_PRINT_A
 
-    ; lbra _START
-    bra HANG	
+    lbra _START
 
 ; -----------------------------------------------------------------
 ; Infinite loop, used for debugging

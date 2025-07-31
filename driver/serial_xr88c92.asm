@@ -148,7 +148,7 @@ PRTB0:
         andb #$04
         beq PRTB0
         sta TXA
-        puls b,pc
+        puls b,pc	; Return from subroutine with character in A
 
 
 ; -----------------------------------------------------------------
