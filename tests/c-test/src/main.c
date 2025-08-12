@@ -1,4 +1,4 @@
-#include "driver/io.h"
+#include "registers.h"
 
 
 int main(void) {
@@ -14,7 +14,7 @@ int main(void) {
     
     for(;;){
         *to++ = *from++;
-        if(to >= (char*)0xFFF0) {
+        if(from >= (char*)0xFFF0) {
             break;
         }
     }

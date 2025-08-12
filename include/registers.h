@@ -66,37 +66,37 @@
 #define SERIAL_BUFFER_SIZE 	            (1024)
 
 // Port A
-#define SERIAL_MRA                      (SERIAL_BASE+0)   // Mode Register A 0 - 2
-#define SERIAL_SRA                      (SERIAL_BASE+1)   // Status Register A
-#define SERIAL_RXA                      (SERIAL_BASE+3)   // Receive Data Register A
-#define SERIAL_TXA                      (SERIAL_BASE+3)   // Transmit Data Register A
-#define SERIAL_CRA                      (SERIAL_BASE+2)   // Command Register A
-#define SERIAL_CSRA                     (SERIAL_BASE+1)   // Clock Select Register A
+#define SERIAL_MRA                      (SERIAL_BASE + 0)   // Mode Register A 0 - 2
+#define SERIAL_SRA                      (SERIAL_BASE + 1)   // Status Register A
+#define SERIAL_RXA                      (SERIAL_BASE + 3)   // Receive Data Register A
+#define SERIAL_TXA                      (SERIAL_BASE + 3)   // Transmit Data Register A
+#define SERIAL_CRA                      (SERIAL_BASE + 2)   // Command Register A
+#define SERIAL_CSRA                     (SERIAL_BASE + 1)   // Clock Select Register A
 
 // Port B
-#define SERIAL_MRB                      (SERIAL_BASE+8)   // Mode Register B 0 - 2
-#define SERIAL_SRB                      (SERIAL_BASE+9)   // Status Register B
-#define SERIAL_RXB                      (SERIAL_BASE+11)  // Receive Data Register B
-#define SERIAL_TXB                      (SERIAL_BASE+11)  // Transmit Data Register B
-#define SERIAL_CRB                      (SERIAL_BASE+10)  // Command Register B
-#define SERIAL_CSRB                     (SERIAL_BASE+9)   // Clock Select Register B
+#define SERIAL_MRB                      (SERIAL_BASE + 8)   // Mode Register B 0 - 2
+#define SERIAL_SRB                      (SERIAL_BASE + 9)   // Status Register B
+#define SERIAL_RXB                      (SERIAL_BASE + 11)  // Receive Data Register B
+#define SERIAL_TXB                      (SERIAL_BASE + 11)  // Transmit Data Register B
+#define SERIAL_CRB                      (SERIAL_BASE + 10)  // Command Register B
+#define SERIAL_CSRB                     (SERIAL_BASE + 9)   // Clock Select Register B
 
 // Common
-#define SERIAL_ACR                      (SERIAL_BASE+4)   // Auxilliary Control Register
-#define SERIAL_ISR                      (SERIAL_BASE+5)   // Interrupt Status Register   
-#define SERIAL_IMR                      (SERIAL_BASE+5)   // Interrupt Mask Register
-#define SERIAL_IPCR                     (SERIAL_BASE+4)   // Input Port Change Register 
-#define SERIAL_OPCR                     (SERIAL_BASE+13)  // Output Port Configuration Register
-#define SERIAL_IPR                      (SERIAL_BASE+13)  // Input Port Register (Bit 0-6)
-#define SERIAL_SPCR                     (SERIAL_BASE+15)  // Stop Counter/Timer Register
-#define SERIAL_ROPR                     (SERIAL_BASE+15)  // Reset Output Port Register
-#define SERIAL_SOPR                     (SERIAL_BASE+14)  // Set Output Port Register
-#define SERIAL_STCR                     (SERIAL_BASE+14)  // Start Counter/Timer Register
-#define SERIAL_GPR                      (SERIAL_BASE+12)  // General Purpose Register
-#define SERIAL_CUR                      (SERIAL_BASE+6)   // Counter/Timer Upper Register
-#define SERIAL_CLR                      (SERIAL_BASE+7)   // Counter/Timer Lower Register
-#define SERIAL_CTPU                     (SERIAL_BASE+6)   // Counter/Timer Preset Upper Register
-#define SERIAL_CTPL                     (SERIAL_BASE+7)   // Counter/Timer Preset Lower Register
+#define SERIAL_ACR                      (SERIAL_BASE + 4)   // Auxilliary Control Register
+#define SERIAL_ISR                      (SERIAL_BASE + 5)   // Interrupt Status Register   
+#define SERIAL_IMR                      (SERIAL_BASE + 5)   // Interrupt Mask Register
+#define SERIAL_IPCR                     (SERIAL_BASE + 4)   // Input Port Change Register 
+#define SERIAL_OPCR                     (SERIAL_BASE + 13)  // Output Port Configuration Register
+#define SERIAL_IPR                      (SERIAL_BASE + 13)  // Input Port Register (Bit 0-6)
+#define SERIAL_SPCR                     (SERIAL_BASE + 15)  // Stop Counter/Timer Register
+#define SERIAL_ROPR                     (SERIAL_BASE + 15)  // Reset Output Port Register
+#define SERIAL_SOPR                     (SERIAL_BASE + 14)  // Set Output Port Register
+#define SERIAL_STCR                     (SERIAL_BASE + 14)  // Start Counter/Timer Register
+#define SERIAL_GPR                      (SERIAL_BASE + 12)  // General Purpose Register
+#define SERIAL_CUR                      (SERIAL_BASE + 6)   // Counter/Timer Upper Register
+#define SERIAL_CLR                      (SERIAL_BASE + 7)   // Counter/Timer Lower Register
+#define SERIAL_CTPU                     (SERIAL_BASE + 6)   // Counter/Timer Preset Upper Register
+#define SERIAL_CTPL                     (SERIAL_BASE + 7)   // Counter/Timer Preset Lower Register
 
 //-----------------------------------------------------------------
 // Compact Flash
