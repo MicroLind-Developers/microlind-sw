@@ -1,0 +1,1 @@
+cmoc -I ../../ --srec --org=EF00 --data=C000 -i -O0 main.c

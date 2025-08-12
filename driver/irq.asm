@@ -3,8 +3,9 @@
 ; -----------------------------------------------------------------
 ; Copyright Eric & Linus Lind 2025
 ;
-
-IRQ_BASE           EQU $f404
+    IFNDEF IO_INC
+        include "io.inc"
+    ENDC
 
 IRQ_JUMP_TABLE:
     FDB _UNUSED_IRQ_ ; SERIAL_IRQ_HANDLER

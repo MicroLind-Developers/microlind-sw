@@ -63,6 +63,8 @@ msg_text3: fcn "│ 3. Memory dump utility                │"
 msg_text4: fcn "│ 4. Joystic ports test utility         │" 
 msg_text5: fcn "  Press a number to continue... "
 
+msg_init0: fcn "µLind BIOS Utility Menu"
+
 msg_setcolor0:   fcb 28,91,48,59,51,54,59,52,48,109  ; \x1b[0;36;40m Cyan on Black
 msg_resetcolor0: fcb 28,91,48,59,51,57,59,52,57,109  ; \x1b[0;39;49m Reset colors
 msg_crlf0:       fcb 13,10,0                         ; \r\n 

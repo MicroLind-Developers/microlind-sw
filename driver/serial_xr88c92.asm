@@ -3,53 +3,58 @@
 ; -----------------------------------------------------------------
 ; Copyright Eric & Linus Lind 2025
 ;
-	* INCLUDE "memory.inc"
-; Reqires S stack pointer to be initialized
+    IFNDEF IO_INC
+        include "io.inc"
+    ENDC
+    IFNDEF MEMORY_INC
+        include "memory.inc"
+    ENDC
 
-; Register Location
-;    org $FF00
-SERIAL_BASE         EQU $F420
+LED_ALL             EQU $07 ; Red, Green, Blue
+LED_RED             EQU $04 ; Red
+LED_GREEN           EQU $02 ; Green
+LED_BLUE            EQU $01 ; Blue
+LED_OFF             EQU $00 ; Off
 
-
-* SERIAL_TIMER_IRQ_JUMP_VECTOR    EQU SERIAL_DRIVER_MEMORY_START      ; 2 byte address for jump vector when timer irq is triggered
-* SERIAL_RXA_IRQ_JUMP_VECTOR      EQU SERIAL_TIMER_IRQ_JUMP_VECTOR+2  ; 2 byte address for jump vector when RXA irq is triggered
-* SERIAL_TXA_IRQ_JUMP_VECTOR      EQU SERIAL_RXA_IRQ_JUMP_VECTOR+2    ; 2 byte address for jump vector when TXA irq is triggered
-* SERIAL_ISR_TEMP                 EQU SERIAL_TXA_IRQ_JUMP_VECTOR+2    ; 1 byte for ISR temp storage
+SERIAL_TIMER_IRQ_JUMP_VECTOR    EQU SERIAL_DRIVER_RAM_START      ; 2 byte address for jump vector when timer irq is triggered
+SERIAL_RXA_IRQ_JUMP_VECTOR      EQU SERIAL_TIMER_IRQ_JUMP_VECTOR+2  ; 2 byte address for jump vector when RXA irq is triggered
+SERIAL_TXA_IRQ_JUMP_VECTOR      EQU SERIAL_RXA_IRQ_JUMP_VECTOR+2    ; 2 byte address for jump vector when TXA irq is triggered
+SERIAL_ISR_TEMP                 EQU SERIAL_TXA_IRQ_JUMP_VECTOR+2    ; 1 byte for ISR temp storage
 
 
 ; COMMON REGISTERS (Direct)
 ; Port A
-MRA              EQU SERIAL_BASE+0   ; Mode Register A 0 - 2
-SRA              EQU SERIAL_BASE+1   ; Status Register A
-RXA              EQU SERIAL_BASE+3   ; Receive Data Register A
-TXA              EQU SERIAL_BASE+3   ; Transmit Data Register A
-CRA              EQU SERIAL_BASE+2   ; Command Register A
-CSRA             EQU SERIAL_BASE+1   ; Clock Select Register A
+SERIAL_MRA              EQU SERIAL_BASE+0   ; Mode Register A 0 - 2
+SERIAL_SRA              EQU SERIAL_BASE+1   ; Status Register A
+SERIAL_RXA              EQU SERIAL_BASE+3   ; Receive Data Register A
+SERIAL_TXA              EQU SERIAL_BASE+3   ; Transmit Data Register A
+SERIAL_CRA              EQU SERIAL_BASE+2   ; Command Register A
+SERIAL_CSRA             EQU SERIAL_BASE+1   ; Clock Select Register A
 
 ;Port B
-MRB              EQU SERIAL_BASE+8   ; Mode Register B 0 - 2
-SRB              EQU SERIAL_BASE+9   ; Status Register B
-RXB              EQU SERIAL_BASE+11  ; Receive Data Register B
-TXB              EQU SERIAL_BASE+11  ; Transmit Data Register B
-CRB              EQU SERIAL_BASE+10  ; Command Register B
-CSRB             EQU SERIAL_BASE+9   ; Clock Select Register B
+SERIAL_MRB              EQU SERIAL_BASE+8   ; Mode Register B 0 - 2
+SERIAL_SRB              EQU SERIAL_BASE+9   ; Status Register B
+SERIAL_RXB              EQU SERIAL_BASE+11  ; Receive Data Register B
+SERIAL_TXB              EQU SERIAL_BASE+11  ; Transmit Data Register B
+SERIAL_CRB              EQU SERIAL_BASE+10  ; Command Register B
+SERIAL_CSRB             EQU SERIAL_BASE+9   ; Clock Select Register B
 
 ;Common
-ACR              EQU SERIAL_BASE+4   ; Auxilliary Control Register
-ISR              EQU SERIAL_BASE+5   ; Interrupt Status Register   
-IMR              EQU SERIAL_BASE+5   ; Interrupt Mask Register
-IPCR             EQU SERIAL_BASE+4   ; Input Port Change Register 
-OPCR             EQU SERIAL_BASE+13  ; Output Port Configuration Register
-IPR              EQU SERIAL_BASE+13  ; Input Port Register (Bit 0-6)
-SPCR             EQU SERIAL_BASE+15  ; Stop Counter/Timer Register
-ROPR             EQU SERIAL_BASE+15  ; Reset Output Port Register
-SOPR             EQU SERIAL_BASE+14  ; Set Output Port Register
-STCR             EQU SERIAL_BASE+14  ; Start Counter/Timer Register
-GPR              EQU SERIAL_BASE+12  ; General Purpose Register
-CUR              EQU SERIAL_BASE+6   ; Counter/Timer Upper Register
-CLR              EQU SERIAL_BASE+7   ; Counter/Timer Lower Register
-CTPU             EQU SERIAL_BASE+6   ; Counter/Timer Preset Upper Register
-CTPL             EQU SERIAL_BASE+7   ; Counter/Timer Preset Lower Register
+SERIAL_ACR              EQU SERIAL_BASE+4   ; Auxilliary Control Register
+SERIAL_ISR              EQU SERIAL_BASE+5   ; Interrupt Status Register   
+SERIAL_IMR              EQU SERIAL_BASE+5   ; Interrupt Mask Register
+SERIAL_IPCR             EQU SERIAL_BASE+4   ; Input Port Change Register 
+SERIAL_OPCR             EQU SERIAL_BASE+13  ; Output Port Configuration Register
+SERIAL_IPR              EQU SERIAL_BASE+13  ; Input Port Register (Bit 0-6)
+SERIAL_SPCR             EQU SERIAL_BASE+15  ; Stop Counter/Timer Register
+SERIAL_ROPR             EQU SERIAL_BASE+15  ; Reset Output Port Register
+SERIAL_SOPR             EQU SERIAL_BASE+14  ; Set Output Port Register
+SERIAL_STCR             EQU SERIAL_BASE+14  ; Start Counter/Timer Register
+SERIAL_GPR              EQU SERIAL_BASE+12  ; General Purpose Register
+SERIAL_CUR              EQU SERIAL_BASE+6   ; Counter/Timer Upper Register
+SERIAL_CLR              EQU SERIAL_BASE+7   ; Counter/Timer Lower Register
+SERIAL_CTPU             EQU SERIAL_BASE+6   ; Counter/Timer Preset Upper Register
+SERIAL_CTPL             EQU SERIAL_BASE+7   ; Counter/Timer Preset Lower Register
 
 
 ; -----------------------------------------------------------------
@@ -60,40 +65,40 @@ CTPL             EQU SERIAL_BASE+7   ; Counter/Timer Preset Lower Register
 ; -----------------------------------------------------------------
 SERIAL_INIT:
         lda #$ba        ;Disable transmiters and recivers, and reset MR pointers to MR0
-        sta CRA
-        sta CRB
+        sta SERIAL_CRA
+        sta SERIAL_CRB
         lda #$20        ;Reset recivers
-        sta CRA
-        sta CRB
+        sta SERIAL_CRA
+        sta SERIAL_CRB
         lda #$30        ;Reset transmiters
-        sta CRA
-        sta CRB
+        sta SERIAL_CRA
+        sta SERIAL_CRB
         lda #$40        ;Reset error status
-        sta CRA
-        sta CRB
+        sta SERIAL_CRA
+        sta SERIAL_CRB
         lda #$01        ;MRA0: Select baud rate table and FIFO triger levels
-        sta MRA
-        sta MRB
+        sta SERIAL_MRA
+        sta SERIAL_MRB
         lda #$93        ;MRA1: Select formating, no parity and 8 data bits, and auto RX RTS control
-        sta MRA
-        sta MRB
+        sta SERIAL_MRA
+        sta SERIAL_MRB
         lda #$17        ;MRA2: Select loopback mode, auto CTS, and 1 stop bit length
-        sta MRA
-        sta MRB
+        sta SERIAL_MRA
+        sta SERIAL_MRB
         lda #$cc        ;Select baud rate 115200
-        sta CSRA
-        sta CSRB
+        sta SERIAL_CSRA
+        sta SERIAL_CSRB
         lda #$80        ;Select baud rate table, C/T mode, and IPCR interupts
-        sta ACR
+        sta SERIAL_ACR
         clra
-        sta IMR         ;Disable all interupts
-        sta OPCR        ;Set output ports 2-7 to manual control
-        lda SPCR        ;Stop the C/T
+        sta SERIAL_IMR         ;Disable all interupts
+        sta SERIAL_OPCR        ;Set output ports 2-7 to manual control
+        lda SERIAL_SPCR        ;Stop the C/T
 
-        * ldd DUMMY_SUBROUTINE ;Load the address of the dummy subroutine into D
-        * std SERIAL_TIMER_IRQ_JUMP_VECTOR ;Initialize the jump vector for the timer interupt
-        * std SERIAL_RXA_IRQ_JUMP_VECTOR ;Initialize the jump vector for the rxa interupt
-        * std SERIAL_TXA_IRQ_JUMP_VECTOR ;Initialize the jump vector for the txa interupt
+; ldd DUMMY_SUBROUTINE ;Load the address of the dummy subroutine into D
+; std SERIAL_TIMER_IRQ_JUMP_VECTOR ;Initialize the jump vector for the timer interupt
+; std SERIAL_RXA_IRQ_JUMP_VECTOR ;Initialize the jump vector for the rxa interupt
+; std SERIAL_TXA_IRQ_JUMP_VECTOR ;Initialize the jump vector for the txa interupt
         
         rts
 
@@ -106,10 +111,10 @@ SERIAL_INIT:
 SERIAL_START:
         lda #$05
         bcs SER_START1 
-        sta CRA
+        sta SERIAL_CRA
         rts
 SER_START1:
-        sta CRB
+        sta SERIAL_CRB
         rts
 
 ; -----------------------------------------------------------------
@@ -123,10 +128,10 @@ SERIAL_PRINT_A:
         bra PTR1
 
 PRT0:
-        ldb SRA
+        ldb SERIAL_SRA
         andb #$04
         beq PRT0
-        sta TXA
+        sta SERIAL_TXA
         
 PTR1:
         lda ,x+
@@ -144,10 +149,10 @@ PTR1:
 SERIAL_PRINT_CHAR_A:
         stb ,-s
 PRTB0:
-        ldb SRA
+        ldb SERIAL_SRA
         andb #$04
         beq PRTB0
-        sta TXA
+        sta SERIAL_TXA
         puls b,pc	; Return from subroutine with character in A
 
 
@@ -181,10 +186,10 @@ INP1:
 INP2:
         jsr SERIAL_PRINT_CHAR_A
 INP0:
-        lda SRA
+        lda SERIAL_SRA
         anda #$01
         beq INP0
-        lda RXA
+        lda SERIAL_RXA
         cmpr y,x
         beq INP3
         cmpa #$7f
@@ -361,8 +366,8 @@ SERIAL_PRINT_CRLF_A:
 ; info:             230400 is the number of ticks per second in Timer/16 mode
 ; -----------------------------------------------------------------
 SERIAL_SET_CT:
-    sta CTPU
-    stb CTPL
+    sta SERIAL_CTPU
+    stb SERIAL_CTPL
     rts
 
 
@@ -381,7 +386,7 @@ SERIAL_SET_CT_MODE:
     lsla
     lsla
     lsla
-    sta ACR
+    sta SERIAL_ACR
     rts
 
 
@@ -395,7 +400,7 @@ SERIAL_SET_CT_MODE:
 ; -----------------------------------------------------------------
 SERIAL_ENABLE_CT_IRQ:
     lda #$08
-    sta IMR
+    sta SERIAL_IMR
     rts
 
 ; -----------------------------------------------------------------
@@ -407,7 +412,7 @@ SERIAL_ENABLE_CT_IRQ:
 ; clobbers:         A
 ; -----------------------------------------------------------------
 SERIAL_START_CT:
-    lda STCR
+    lda SERIAL_STCR
     rts
 
 ; -----------------------------------------------------------------
@@ -419,65 +424,141 @@ SERIAL_START_CT:
 ; clobbers:         A
 ; -----------------------------------------------------------------
 SERIAL_STOP_CT:
-    lda SPCR
+    lda SERIAL_SPCR
+    rts
+
+
+; POWER_LED is controlled by the serial port
+
+; -----------------------------------------------------------------
+; SET_LED
+; input:            A = LED state, 0 = OFF, 1 = RED, 2 = GREEN, 
+;                   3 = RED+GREEN, 4 = BLUE, 5 = RED+BLUE, 6 = GREEN+BLUE,
+;                   7 = RED+GREEN+BLUE
+; output:           None
+; clobbers:         None
+; -----------------------------------------------------------------
+SET_LED:
+    jsr SET_LED_OFF
+    ; If A is 0, we are done
+    cmpa #$00
+    beq _DONE
+
+    ; Else set the LED
+    sta SERIAL_OPCR
+
+_DONE:
+    rts
+
+; -----------------------------------------------------------------
+; SET_LED_RED
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+SET_LED_RED:
+    jsr SET_LED_OFF
+    lda #LED_RED
+    sta SERIAL_OPCR
+    rts
+
+; -----------------------------------------------------------------
+; SET_LED_GREEN
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+SET_LED_GREEN:
+    jsr SET_LED_OFF
+    lda #LED_GREEN
+    sta SERIAL_OPCR
+    rts
+
+; -----------------------------------------------------------------
+; SET_LED_BLUE
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+SET_LED_BLUE:
+    jsr SET_LED_OFF
+    lda #LED_BLUE
+    sta SERIAL_OPCR
+    rts
+
+; -----------------------------------------------------------------
+; SET_LED_OFF
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+SET_LED_OFF:
+    lda #LED_OFF
+    sta SERIAL_OPCR
     rts
 
 ; -----------------------------------------------------------------
 ; Set the serial interrupt service routine jump vector
 ; -----------------------------------------------------------------
-; SET_SERIAL_TIMER_IRQ_JUMP_VECTOR
-; input:            D 
+; SET_SERIAL_xxx_IRQ_JUMP_VECTOR
+; input:            D = 2 byte address of the interrupt service routine
 ; output:           None
 ; clobbers:         None
 ; -----------------------------------------------------------------
-* SET_SERIAL_TIMER_IRQ_JUMP_VECTOR:
-*     ; Set the interrupt vector to the serial interrupt handler
-*     std SERIAL_TIMER_IRQ_JUMP_VECTOR
-*     rts
+SET_SERIAL_TIMER_IRQ_JUMP_VECTOR:
+    ; Set the interrupt vector to the timer interrupt handler
+    std SERIAL_TIMER_IRQ_JUMP_VECTOR
+    rts
 
-* SET_SERIAL_RXA_IRQ_JUMP_VECTOR:
-*     ; Set the interrupt vector to the serial interrupt handler
-*     ldw SERIAL_RXA_IRQ_JUMP_VECTOR
-*     std SERIAL_RXA_IRQ_JUMP_VECTOR
-*     rts
+SET_SERIAL_RXA_IRQ_JUMP_VECTOR:
+    ; Set the interrupt vector to the serial receive interrupt handler
+    std SERIAL_RXA_IRQ_JUMP_VECTOR
+    rts
 
-* SET_SERIAL_TXA_IRQ_JUMP_VECTOR:
-*     ; Set the interrupt vector to the serial interrupt handler
-*     ldw SERIAL_TXA_IRQ_JUMP_VECTOR
-*     std SERIAL_TXA_IRQ_JUMP_VECTOR
-*     rts
+SET_SERIAL_TXA_IRQ_JUMP_VECTOR:
+    ; Set the interrupt vector to the serial transmit interrupt handler
+    std SERIAL_TXA_IRQ_JUMP_VECTOR
+    rts
 
-* SERIAL_IRQ_HANDLER:
-*     lda ISR
-*     sta SERIAL_ISR_TEMP
-*     tsta #$08
-*     bne _TIMER_READY
+; -----------------------------------------------------------------
+; Serial interrupt handlers
+; -----------------------------------------------------------------
+; SERIAL_IRQ_HANDLER
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+; SERIAL_IRQ_HANDLER:
+;    lda ISR
+;    sta SERIAL_ISR_TEMP
+;    tsta #$08
+;    bne _TIMER_READY
 
-* _RTS_TIMER:
-*     lda SERIAL_ISR_TEMP
-*     tsta #$02
-*     bne _RXA_FULL
+; _RTS_TIMER:
+;     lda SERIAL_ISR_TEMP
+;     tsta #$02
+;     bne _RXA_FULL
 
-* _RTS_RXA:
-*     lda SERIAL_ISR_TEMP
-*     tsta #$01
-*     bne _TXA_EMPTY
+; _RTS_RXA:
+;     lda SERIAL_ISR_TEMP
+;     tsta #$01
+;     bne _TXA_EMPTY
 
-* _RTS_TXA:
-*     rti
+; _RTS_TXA:
+;     rti
 
-* _TIMER_READY:
-*     ; Timer interrupt
-*     jsr SERIAL_STOP_CT
-*     jsr [SERIAL_TIMER_IRQ_JUMP_VECTOR]
-*     bra _RTS_TIMER
+; _TIMER_READY:
+;     ; Timer interrupt
+;     jsr SERIAL_STOP_CT
+;     jsr [SERIAL_TIMER_IRQ_JUMP_VECTOR]
+;     bra _RTS_TIMER
 
-* _RXA_FULL:
-*     ;TODO: RXA full interrupt handling
-*     jsr [SERIAL_RXA_IRQ_JUMP_VECTOR]
-*     bra _RTS_RXA
+; _RXA_FULL:
+;     ;TODO: RXA full interrupt handling
+;     jsr [SERIAL_RXA_IRQ_JUMP_VECTOR]
+;     bra _RTS_RXA
 
-* _TXA_EMPTY:
-*     ;TODO: TXA empty interrupt handling
-*     jsr [SERIAL_TXA_IRQ_JUMP_VECTOR]
-*     bra _RTS_TXA
+; _TXA_EMPTY:
+;     ;TODO: TXA empty interrupt handling
+;     jsr [SERIAL_TXA_IRQ_JUMP_VECTOR]
+;     bra _RTS_TXA

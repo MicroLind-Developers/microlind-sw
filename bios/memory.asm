@@ -1,3 +1,30 @@
+; -----------------------------------------------------------------
+; MEMORY_CLEAR_BUFFER
+; input:            X = start address (0x0000 - 0xFFFF)
+;                   D = size (0x0000 - 0xFFFF)
+; output:           None
+; clobbers:         None
+; -----------------------------------------------------------------
+MEMORY_CLEAR_BUFFER:
+    pshs X,D
+
+    ; Clear byte
+    lda #$00
+
+_CLEAR_LOOP:
+    sta ,X+
+    decd
+    bne _CLEAR_LOOP
+    puls X,D,PC      ; return to PC
+
+
+; -----------------------------------------------------------------
+; MEMORY_DUMP
+; input:            X = start address (0x0000 - 0xFFFF)
+;                   Y = end address (0x0001 - 0xFFFF)
+; output:           None
+; clobbers:         A, B
+; -----------------------------------------------------------------
 ; Output:
 ; Bank Settings
 ;     Bank 0: 0x00
@@ -10,14 +37,6 @@
 ; 0x0010 A1 29 93 BF F9 93 37 7A AC DF FF FF FF 00 00
 ; ---------------------------------------------------
 
-
-; -----------------------------------------------------------------
-; MEMORY_DUMP
-; input:            X = start address (0x0000 - 0xFFFF)
-;                   Y = end address (0x0001 - 0xFFFF)
-; output:           None
-; clobbers:         A, B
-; -----------------------------------------------------------------
 MEMORY_DUMP:
     
     ; Print bank settings

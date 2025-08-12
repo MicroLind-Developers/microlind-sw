@@ -3,9 +3,10 @@
 ; -----------------------------------------------------------------
 ; Copyright Eric & Linus Lind 2025
 ;
-;    org $FE10
 
-MMU_BASE            EQU $f400
+    IFNDEF IO_INC
+        include "io.inc"
+    ENDC
 
 MMU_REG_0           EQU MMU_BASE+0
 MMU_REG_1           EQU MMU_BASE+1
@@ -57,6 +58,7 @@ MMU_SET_REGISTER_2:
 MMU_SET_REGISTER_3:
     sta MMU_REG_3
     rts
+
 ; -----------------------------------------------------------------
 ; GET MMU REGISTER
 ; input:            X = Register number (0-3)

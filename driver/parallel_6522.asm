@@ -3,18 +3,27 @@
 ; -----------------------------------------------------------------
 ; Copyright Eric & Linus Lind 2025
 ;   
+    IFNDEF IO_INC
+        include "io.inc"
+    ENDC
 
-;    org $FE00
-PARALLEL_BASE           EQU $F410
-
-ORB_22                  EQU PARALLEL_BASE
-ORA_22                  EQU PARALLEL_BASE+1
-DDRA_22                 EQU PARALLEL_BASE+2
-DDRB_22                 EQU PARALLEL_BASE+3
-ACR_22                  EQU PARALLEL_BASE+11
-PCR_22                  EQU PARALLEL_BASE+12
-IFR_22                  EQU PARALLEL_BASE+13
-IER_22                  EQU PARALLEL_BASE+14
+PARALLEL_ORB            EQU PARALLEL_BASE+0
+PARALLEL_IRB            EQU PARALLEL_BASE+0
+PARALLEL_ORA            EQU PARALLEL_BASE+1
+PARALLEL_IRA            EQU PARALLEL_BASE+1
+PARALLEL_DDRA           EQU PARALLEL_BASE+2
+PARALLEL_DDRB           EQU PARALLEL_BASE+3
+PARALLEL_T1CL           EQU PARALLEL_BASE+4
+PARALLEL_T1CH           EQU PARALLEL_BASE+5
+PARALLEL_T1LL           EQU PARALLEL_BASE+6
+PARALLEL_T1LH           EQU PARALLEL_BASE+7
+PARALLEL_T2CL           EQU PARALLEL_BASE+8
+PARALLEL_T2CH           EQU PARALLEL_BASE+9
+PARALLEL_SR             EQU PARALLEL_BASE+10
+PARALLEL_ACR            EQU PARALLEL_BASE+11
+PARALLEL_PCR            EQU PARALLEL_BASE+12
+PARALLEL_IFR            EQU PARALLEL_BASE+13
+PARALLEL_IER            EQU PARALLEL_BASE+14
 
 TIMER_1_IRQ             EQU $40
 
@@ -26,22 +35,22 @@ TIMER_1_IRQ             EQU $40
 ; -----------------------------------------------------------------
 PARALLEL_INIT:
         ; Set all pins to input (DDR = 0)
-        clr   DDRA_22      ; DDRA
-        clr   DDRB_22      ; DDRB
+        clr   PARALLEL_DDRA      ; DDRA
+        clr   PARALLEL_DDRB      ; DDRB
 
         ; Clear Output Registers
         ; clr   ORA_22      ; ORA
         ; clr   ORB_22      ; ORB
 
         ; Set ACR to 0 — disables timers, shift reg, etc.
-        clr   ACR_22     ; ACR
+        clr   PARALLEL_ACR     ; ACR
 
         ; Set PCR to 0 — makes CA1/CA2 and CB1/CB2 all input, no latching
-        clr   PCR_22     ; PCR
+        clr   PARALLEL_PCR     ; PCR
 
         ; Clear interrupts (write with bit 7 = 0 to disable specific sources)
         lda   #$7F
-        sta   IER_22     ; IER — disable all
+        sta   PARALLEL_IER     ; IER — disable all
 
 
 ; -----------------------------------------------------------------
@@ -51,9 +60,9 @@ PARALLEL_INIT:
 ; clobbers:         A
 ; -----------------------------------------------------------------
 PARALLEL_ENABLE_TIMER_INTERRUPT:
-        lda IER_22
+        lda PARALLEL_IER
         ora #TIMER_1_IRQ        ; Enable timer 1 interrupt      
-        sta IER_22
+        sta PARALLEL_IER
         rts
 
 ; -----------------------------------------------------------------
@@ -63,10 +72,10 @@ PARALLEL_ENABLE_TIMER_INTERRUPT:
 ; clobbers:         A
 ; -----------------------------------------------------------------
 PARALLEL_DISABLE_TIMER_INTERRUPT:
-        lda IER_22
+        lda PARALLEL_IER
         ldb #TIMER_1_IRQ
         eorr b,a                ; Disable timer 1 interrupt
-        sta IER_22
+        sta PARALLEL_IER
         rts
 
 ; -----------------------------------------------------------------
@@ -77,7 +86,7 @@ PARALLEL_DISABLE_TIMER_INTERRUPT:
 ; -----------------------------------------------------------------
 PARALLEL_RESET_INTERRUPT:
         lda #TIMER_1_IRQ        ; Reset timer 1 interrupt
-        sta IFR_22
+        sta PARALLEL_IFR
         rts
 
 ; -----------------------------------------------------------------
@@ -87,7 +96,7 @@ PARALLEL_RESET_INTERRUPT:
 ; clobbers:         A
 ; -----------------------------------------------------------------
 PARALLEL_GET_PORT_A:
-        lda ORA_22
+        lda PARALLEL_ORA
         rts
 
 
@@ -99,7 +108,7 @@ PARALLEL_GET_PORT_A:
 ; clobbers:         A
 ; -----------------------------------------------------------------
 READ_JOY1:
-        lda   ORA_22
+        lda   PARALLEL_ORA
         eora  #$FF
         anda   #%00011111
         rts
@@ -112,7 +121,7 @@ READ_JOY1:
 ; clobbers:         A
 ; -----------------------------------------------------------------
 READ_JOY2:
-        lda   ORB_22
+        lda   PARALLEL_ORB
         eora  #$FF
         anda   #%00011111
         rts
