@@ -1,5 +1,6 @@
 #ifndef _RTC_H_
-#
+#define _RTC_H_
+
 //-----------------------------------------------------------------
 // Real Time Clock (RTC)
 // Register Map $F418 - $F41F
@@ -12,3 +13,7 @@
 #define RTC_HOUR                    (RTC_BASE + 3)
 #define RTC_MINUTE                  (RTC_BASE + 4)
 #define RTC_SECOND                  (RTC_BASE + 5)
+
+
+
+#endif // _RTC_H_

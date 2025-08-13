@@ -22,6 +22,7 @@ HOOK_NMI:
 HOOK_RESET:
     jmp INIT
 
+; -----------------------------------------------------------------
 INIT:
     ; ---- CPU RESET ENTRY POINT ----
     ; Start by turning off interrupts

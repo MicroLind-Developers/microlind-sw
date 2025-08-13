@@ -1,7 +1,14 @@
 #include "registers.h"
+#include "bios.h"
 
 
 int main(void) {
+    mmu_init();
+    serial_init();
+    serial_start();
+    serial_print("Hello, World!\n");
+
+    // Set the MMU driver
     char* mmu_driver = (char*)MMU_REG_0;
     mmu_driver[0] = 0x00;
     mmu_driver[1] = 0x01;

@@ -3,7 +3,7 @@ BUILD = build
 
 SERIAL_SRC = init.asm  ../driver/serial_xr88c92.asm ../driver/mmu.asm ../driver/led.asm ../driver/parallel_6522.asm ../driver/irq.asm memory.asm mlbios.asm
 SERIAL_OBJ = $(SERIAL_SRC:.asm=.o)
-SERIAL_BIN = $(BUILD)/serial.$(FORMAT)
+SERIAL_BIN = $(BUILD)/bios.$(FORMAT)
 
 all: serial
 
