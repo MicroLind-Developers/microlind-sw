@@ -4,7 +4,7 @@
 ; Copyright Eric & Linus Lind 2025
 ;
 
-    include "memory.inc"
+    include "../include/memory.inc"
 
 EXP_BASE        EQU $F600
 EXP_DATA_START  EQU $D800

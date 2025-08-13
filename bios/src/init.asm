@@ -3,7 +3,7 @@
 ; -----------------------------------------------------------------
 ; Copyright Eric & Linus Lind 2024
 ;
-    INCLUDE "memory.inc"
+    INCLUDE "../include/memory.inc"
     org $FF00
 
 HOOK_TRAP:
@@ -79,6 +79,7 @@ INIT:
 ; input:            None
 ; output:           None
 ; -----------------------------------------------------------------
+    export HANG
 HANG:
     bra HANG
 

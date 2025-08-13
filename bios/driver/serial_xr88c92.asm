@@ -4,10 +4,10 @@
 ; Copyright Eric & Linus Lind 2025
 ;
     IFNDEF IO_INC
-        include "io.inc"
+        include "../include/io.inc"
     ENDC
     IFNDEF MEMORY_INC
-        include "memory.inc"
+        include "../include/memory.inc"
     ENDC
 
 LED_ALL             EQU $07 ; Red, Green, Blue
@@ -206,7 +206,7 @@ INP0:
 
 ERR:
         jsr SERIAL_PRINT_A
-        jmp HANG
+        ; jmp HANG
 
 err_bufferSize0: fcn '?illegal buffer size exception'
 

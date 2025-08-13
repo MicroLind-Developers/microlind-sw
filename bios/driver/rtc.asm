@@ -4,7 +4,7 @@
 ; Copyright Eric & Linus Lind 2024
 
     IFNDEF IO_INC
-        include "io.inc"
+        include "../include/io.inc"
     ENDC
 
 RTC_YEAR            EQU  RTC_BASE+0 ; Year

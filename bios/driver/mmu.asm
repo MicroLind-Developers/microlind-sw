@@ -5,7 +5,7 @@
 ;
 
     IFNDEF IO_INC
-        include "io.inc"
+        include "../include/io.inc"
     ENDC
 
 MMU_REG_0           EQU MMU_BASE+0

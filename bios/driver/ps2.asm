@@ -4,7 +4,7 @@
 ; Copyright Eric & Linus Lind 2024
 ;   
     IFNDEF IO_INC
-        include "io.inc"
+        include "../include/io.inc"
     ENDC
 
 PS2_KBD             EQU PS2_BASE+0 ; Keypress / Kbd command

@@ -4,7 +4,7 @@
 ; Copyright Eric & Linus Lind 2025
 ;
     IFNDEF IO_INC
-        include "io.inc"
+        include "../include/io.inc"
     ENDC
 
 IRQ_JUMP_TABLE:
