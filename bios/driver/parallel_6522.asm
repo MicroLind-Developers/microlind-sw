@@ -27,6 +27,9 @@ PARALLEL_IER            EQU PARALLEL_BASE+14
 
 TIMER_1_IRQ             EQU $40
 
+SPI_TFR_READY           EQU $0000 ; Hold the SPI transfer ready flag
+
+
 ; -----------------------------------------------------------------
 ; PARALLEL INIT
 ; input:            None
@@ -78,6 +81,61 @@ PARALLEL_DISABLE_TIMER_INTERRUPT:
         sta PARALLEL_IER
         rts
 
+
+; -----------------------------------------------------------------
+; ENABLE SPI OUTPUT
+; This enables the shift register to output data to the CB2 pin
+; at 1/2 of E clock speed
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+PARALLEL_ENABLE_SPI_OUTPUT:
+        lda PARALLEL_ACR
+        ora #%00011100
+        sta PARALLEL_ACR
+        rts
+
+; -----------------------------------------------------------------
+; DISABLE SPI OUTPUT
+; This disables the shift register from outputting data to the CB2 pin
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+PARALLEL_DISABLE_SPI_OUTPUT:
+        lda PARALLEL_ACR
+        anda #%11100011
+        sta PARALLEL_ACR
+        rts
+
+; -----------------------------------------------------------------
+; ENABLE SPI INPUT
+; This enables the shift register to input data from the CB2 pin
+; using CB1 as the clock output
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+PARALLEL_ENABLE_SPI_INPUT:
+        lda PARALLEL_ACR
+        ora #%00001100
+        sta PARALLEL_ACR
+        rts
+
+; -----------------------------------------------------------------
+; DISABLE SPI INPUT
+; This disables the shift register from inputting data from the CB2 pin
+; input:            None
+; output:           None
+; clobbers:         A
+; -----------------------------------------------------------------
+PARALLEL_DISABLE_SPI_INPUT:
+        lda PARALLEL_ACR
+        anda #%11110011
+        sta PARALLEL_ACR
+        rts
+
 ; -----------------------------------------------------------------
 ; RESET INTERRUPT
 ; input:            None
@@ -126,6 +184,49 @@ READ_JOY2:
         anda   #%00011111
         rts
 
+; -----------------------------------------------------------------
+; START_SPI_DATA_STREAM (Blocking)
+; input:            X = Data address to send from
+;                   A = Data length to send
+; output:           None
+; clobbers:         None
+; -----------------------------------------------------------------
+PARALLEL_START_SPI_DATA_STREAM:
+        PSHS A,B,X        
+        TFR A,B
+        ; TODO: Add a ....
+
+        ; Check if the SPI transfer is ready
+        LDA SPI_TFR_READY
+        BNE _SPI_TFR_RETRY
+
+        LDE MAX_TFR_RETRIES+1
+_SPI_TFR_RETRY:
+        TFR E,B
+        DECB
+        BEQ _SPI_TFR_FAILED
+
+_SEND_SPI_DATA_STREAM:
+        ; Check if the SPI transfer is ready
+        LDA SPI_TFR_READY
+        BNE _SEND_SPI_DATA_STREAM
+
+        LDA ,X+
+        STA PARALLEL_SR
+        DECB
+        BNE _SEND_SPI_DATA_STREAM
+
+_SPI_TFR_FAILED:
+        LDB #$00
+
+        PULS X,B,A,PC
+
+
 PARALLEL_IRQ_HANDLER:
         ; TODO: Handle IRQ here
+
+        ; Check if the IRQ is for the SPI transfer
+        ; LDA #$01
+        ; STA SPI_TFR_READY
+
         rti
