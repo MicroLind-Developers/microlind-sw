@@ -6,6 +6,11 @@
     IFNDEF IO_INC
         include "../include/io.inc"
     ENDC
+    IFNDEF MEMORY_INC
+        include "../include/memory.inc"
+    ENDC
+
+PARALLEL_BASE IMPORT
 
 PARALLEL_ORB            EQU PARALLEL_BASE+0
 PARALLEL_IRB            EQU PARALLEL_BASE+0

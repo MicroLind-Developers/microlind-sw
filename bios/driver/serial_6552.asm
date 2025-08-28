@@ -5,31 +5,8 @@
 ;
 
 ; Register Location
-    org $FF00
-SERIAL_BASE         EQU $f400
 
-; COMMON REGISTERS (Offset)
-; Port A
-; TDR1                EQU $03   ; Transmit Data Register
-; RDR1                EQU $03   ; Receive Data Register
-; IER1                EQU $00   ; Interupt Enable Register
-; ISR1                EQU $00   ; Interupt Status Register
-; CR1                 EQU $01   ; Control Register (Bit 7 EQU low)
-; FR1                 EQU $01   ; Format Register (Bit 7 EQU high)
-; CSR1                EQU $01   ; Control Status Register
-; CDR1                EQU $02   ; Compare Data Register (Bit 6 EQU low)
-; ACR1                EQU $02   ; Auxilliary Control Register (Bit 6 EQU high)
-
-; ;Port B
-; TDR2                EQU $07   ; Transmit Data Register
-; RDR2                EQU $07   ; Receive Data Register
-; IER2                EQU $04   ; Interupt Enable Register
-; ISR2                EQU $04   ; Interupt Status Register
-; CR2                 EQU $05   ; Control Register (Bit 7 EQU low)
-; FR2                 EQU $05   ; Format Register (Bit 7 EQU high)
-; CSR2                EQU $05   ; Control Status Register
-; CDR2                EQU $06   ; Compare Data Register (Bit 6 EQU low)
-; ACR2                EQU $06   ; Auxilliary Control Register (Bit 6 EQU high)
+SERIAL_BASE IMPORT
 
 ; COMMON REGISTERS (Direct)
 ; Port A
