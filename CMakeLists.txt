@@ -95,6 +95,7 @@ add_subdirectory(bios)
 add_subdirectory(driver)
 add_subdirectory(wozmon)
 add_subdirectory(srec)
+add_subdirectory(mlfs)
 
 # Create a default target that will be built when running 'make'
 add_custom_target(all-targets ALL
