@@ -1,6 +1,6 @@
 ---
 # Configuration for clang-format
-BasedOnStyle: LLVM
+BasedOnStyle: Google
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
@@ -11,5 +11,5 @@ AllowShortLoopsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
 IndentCaseLabels: true
 SpaceBeforeParens: Never
-AlignConsecutiveAssignments: false
-AlignConsecutiveDeclarations: false
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
