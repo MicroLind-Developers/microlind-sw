@@ -70,7 +70,7 @@ main() {
     
     # Step 1: Build module
     log_info "Step 1: Building kernel module..."
-    cd "$SCRIPT_DIR"
+    cd "$SCRIPT_DIR/.."  # Go to kmod directory
     make clean
     make
     
@@ -90,10 +90,11 @@ main() {
     # Step 3: Format with MLFS
     log_info "Step 3: Formatting with MLFS..."
     
-    # Find mlfs_blockdev tool
+    # Find mlfs_blockdev tool (we're in kmod/ directory now)
     BLOCKDEV_TOOL=""
     for path in "../build/tools/mlfs_blockdev/mlfs_blockdev" \
-                "../build-coverage/tools/mlfs_blockdev/mlfs_blockdev"; do
+                "../build-coverage/tools/mlfs_blockdev/mlfs_blockdev" \
+                "../../build/tools/mlfs_blockdev/mlfs_blockdev"; do
         if [ -f "$path" ]; then
             BLOCKDEV_TOOL="$path"
             break

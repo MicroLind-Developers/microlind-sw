@@ -32,7 +32,7 @@ echo -e "${GREEN}[1/5] Creating test environment...${NC}"
 sudo mkdir -p "$TESTDIR"
 sudo mkdir -p "$MOUNTPOINT"
 sudo chmod 777 "$TESTDIR"
-cd ../  # Go to mlfs root
+cd ../../  # Go to mlfs root (from kmod/tests)
 
 # Create image with files
 echo -e "${GREEN}[2/5] Creating MLFS image with test files...${NC}"
@@ -59,7 +59,7 @@ info
 exit
 MLFS_EOF
 
-./build/cli/mlfs < /tmp/test_setup.mlfs
+./build/tools/cli/mlfs < /tmp/test_setup.mlfs
 
 echo ""
 echo -e "${BLUE}Image created: $IMGFILE${NC}"
@@ -69,7 +69,7 @@ ls -lh "$IMGFILE"
 echo ""
 echo -e "${GREEN}[3/5] Setting up loopback device...${NC}"
 sudo losetup /dev/loop20 "$IMGFILE"
-cd kmod
+cd mlfs/kmod
 sudo insmod mlfs.ko debug=1
 echo "Module loaded"
 

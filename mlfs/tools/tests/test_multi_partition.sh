@@ -8,14 +8,14 @@ echo "==================================="
 echo ""
 
 # Build the project if needed
-if [ ! -f "../build/cli/mlfs" ] || [ ! -f "../build/tools/mlfs_info" ]; then
+if [ ! -f "../../build/tools/cli/mlfs" ] || [ ! -f "../../build/tools/mlfs_info/mlfs_info" ]; then
     echo "Building MLFS project..."
-    cd ..
+    cd ../..
     mkdir -p build
     cd build
     cmake ..
     make
-    cd tools
+    cd tools/tests
     echo ""
 fi
 
@@ -52,10 +52,10 @@ quit
 EOF
 
 # Run the CLI commands
-if [ -f "../build/cli/mlfs" ]; then
+if [ -f "../../build/tools/cli/mlfs" ]; then
     echo "Running CLI to create test filesystem..."
     echo "----------------------------------------"
-    ../build/cli/mlfs < test_multi_commands.txt
+    ../../build/tools/cli/mlfs < test_multi_commands.txt
     echo ""
     echo "Filesystem creation completed."
     echo ""
@@ -65,35 +65,35 @@ else
 fi
 
 # Test mlfs_info tool with different partition numbers
-if [ -f "../build/tools/mlfs_info" ] && [ -f "test_multi.img" ]; then
+if [ -f "../../build/tools/mlfs_info/mlfs_info" ] && [ -f "test_multi.img" ]; then
     echo "Testing mlfs_info tool..."
     echo "========================="
     echo ""
     
     echo "1. Overview mode (no partition specified - shows partition table only):"
     echo "-----------------------------------------------------------------------"
-    ../build/tools/mlfs_info test_multi.img
+    ../../build/tools/mlfs_info/mlfs_info test_multi.img
     echo ""
     
     echo "2. Detailed analysis of partition 0 (shows filesystem + directory tree):"
     echo "------------------------------------------------------------------------"
-    ../build/tools/mlfs_info test_multi.img 0
+    ../../build/tools/mlfs_info/mlfs_info test_multi.img 0
     echo ""
     
     echo "3. Detailed analysis of partition 1 (shows filesystem + directory tree):"
     echo "------------------------------------------------------------------------"
-    ../build/tools/mlfs_info test_multi.img 1
+    ../../build/tools/mlfs_info/mlfs_info test_multi.img 1
     echo ""
     
     echo "4. Detailed analysis of partition 2 (shows filesystem + directory tree):"
     echo "------------------------------------------------------------------------"
-    ../build/tools/mlfs_info test_multi.img 2
+    ../../build/tools/mlfs_info/mlfs_info test_multi.img 2
     echo ""
     
     # Test with invalid partition
     echo "5. Testing with invalid partition 99 (should fail gracefully):"
     echo "--------------------------------------------------------------"
-    ../build/tools/mlfs_info test_multi.img 99 2>/dev/null || echo "Failed as expected - partition 99 does not exist"
+    ../../build/tools/mlfs_info/mlfs_info test_multi.img 99 2>/dev/null || echo "Failed as expected - partition 99 does not exist"
     echo ""
 else
     echo "Error: mlfs_info tool or test image not found."
@@ -124,7 +124,7 @@ EOF
 echo ""
 echo "CLI session demonstrating partition commands:"
 echo "--------------------------------------------"
-../build/cli/mlfs < test_partition_commands.txt
+../../build/tools/cli/mlfs < test_partition_commands.txt
 echo ""
 
 # Show CLI usage examples

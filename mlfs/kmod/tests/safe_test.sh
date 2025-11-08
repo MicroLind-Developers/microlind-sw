@@ -40,14 +40,14 @@ echo "Created: $IMGFILE"
 
 # Step 3: Format the image with MLFS using the CLI
 echo -e "${GREEN}[3/8] Formatting image with MLFS...${NC}"
-cd ../  # Go to mlfs root
-if [ ! -f "build/cli/mlfs" ]; then
+cd ../../  # Go to mlfs root (from kmod/tests)
+if [ ! -f "build/tools/cli/mlfs" ]; then
     echo -e "${RED}ERROR: CLI tool not built. Run 'cmake --build build' first${NC}"
     exit 1
 fi
 
 # Create a partition and filesystem
-./build/cli/mlfs << 'EOF'
+./build/tools/cli/mlfs << 'EOF'
 format /tmp/mlfs_test/test.img 10
 mkpart 1 8 4096 testpart
 mkfs 0
@@ -64,7 +64,7 @@ echo "Loopback device: /dev/loop20"
 
 # Step 5: Load the kernel module
 echo -e "${GREEN}[5/8] Loading MLFS kernel module...${NC}"
-cd kmod
+cd mlfs/kmod
 sudo insmod mlfs.ko debug=1
 lsmod | grep mlfs
 echo "Module loaded successfully!"

@@ -4,6 +4,28 @@ This directory contains utility tools for working with MLFS filesystem images.
 
 ## Tools
 
+### `cli/`
+
+The MLFS command-line interface - an interactive shell for creating, managing, and working with MLFS filesystem images.
+
+**Key Features:**
+- Interactive shell with command history and prompts
+- Create and format MLFS images with custom sizes
+- Multi-partition support with flexible layouts
+- Full filesystem operations (mkdir, touch, write, read, rm, rmdir)
+- Navigation with cd, pwd, ls commands
+- Partition management (mkpart, mkfs, mount, unmount)
+- File content operations (cat, write)
+- Filesystem information display (info, partitions)
+- Batch command support via stdin
+
+**Usage:** 
+- Interactive: `mlfs`
+- Mount existing image: `mlfs <image_file>`
+- Batch mode: `mlfs < commands.txt`
+
+See [cli/README.md](cli/README.md) and [cli/USAGE.md](cli/USAGE.md) for detailed documentation and examples.
+
 ### `mlfs_info/`
 
 A comprehensive filesystem analysis tool that parses MLFS image files and displays detailed information about the filesystem structure and contents.
@@ -43,6 +65,14 @@ See [mlfs_blockdev/README.md](mlfs_blockdev/README.md) for detailed documentatio
 
 ```
 tools/
+├── cli/                    # Interactive CLI tool
+│   ├── main.c              # CLI interface
+│   ├── cli_commands.c/h    # Command implementations
+│   ├── file_io.c           # File I/O operations
+│   ├── CMakeLists.txt      # Build configuration
+│   ├── README.md           # Detailed documentation
+│   ├── USAGE.md            # Usage guide
+│   └── example_usage.sh    # Example script
 ├── mlfs_info/              # Filesystem analysis tool
 │   ├── mlfs_info.c         # Source code
 │   ├── CMakeLists.txt      # Build configuration  
@@ -51,23 +81,46 @@ tools/
 │   ├── mlfs_blockdev.c     # Source code
 │   ├── CMakeLists.txt      # Build configuration
 │   └── README.md           # Detailed documentation
+├── tests/                  # Test scripts
+│   ├── test_mlfs_info.sh   # mlfs_info tests
+│   ├── test_multi_partition.sh  # Multi-partition tests
+│   └── test_subdirs.sh     # Subdirectory tests
 ├── CMakeLists.txt          # Tools build configuration
-├── README.md               # This file
-└── test_*.sh              # Test scripts
+└── README.md               # This file
 ```
 
 ## Tool Comparison
 
-| Feature | mlfs_info | mlfs_blockdev |
-|---------|-----------|---------------|
-| **Purpose** | Analyze/inspect MLFS images | Manage MLFS on block devices |
-| **Input** | Image files or devices | Block devices only |
-| **Access** | Read-only | Read-only or read-write |
-| **Use Case** | Safe examination | Hardware setup & management |
-| **Requires Root** | No (for files) | Yes (for write operations) |
-| **Risk Level** | Safe | High (can destroy data) |
+| Feature | CLI | mlfs_info | mlfs_blockdev |
+|---------|-----|-----------|---------------|
+| **Purpose** | Create and manage MLFS images | Analyze/inspect MLFS images | Manage MLFS on block devices |
+| **Input** | Image files | Image files or devices | Block devices only |
+| **Access** | Read-write | Read-only | Read-only or read-write |
+| **Use Case** | Image creation & manipulation | Safe examination | Hardware setup & management |
+| **Interactive** | Yes (shell interface) | No (command-line tool) | No (command-line tool) |
+| **Requires Root** | No | No (for files) | Yes (for write operations) |
+| **Risk Level** | Safe (works with files) | Safe | High (can destroy data) |
 
 ## Quick Start Examples
+
+### Creating an Image File with CLI (Safe)
+```bash
+# Start interactive CLI
+mlfs
+
+# Or create and work with an image directly
+mlfs << EOF
+format disk.img 32 4096
+mount disk.img
+mkdir documents
+touch readme.txt
+write readme.txt "Welcome to MLFS!"
+ls
+cat readme.txt
+info
+quit
+EOF
+```
 
 ### Examining an Image File (Safe)
 ```bash
@@ -90,6 +143,29 @@ sudo mlfs_blockdev /dev/sdb mkfs 0
 
 # Step 3: Verify with read-only tools
 sudo mlfs_blockdev -r /dev/sdb info
+sudo mlfs_info /dev/sdb 0
+```
+
+### Typical Workflow
+```bash
+# 1. Create image with CLI
+mlfs << EOF
+format myfs.img 64
+mkpart 1 32 4096 main
+mkfs 0
+mount myfs.img 0
+mkdir data
+touch data/config.ini
+quit
+EOF
+
+# 2. Analyze with mlfs_info
+mlfs_info myfs.img 0
+
+# 3. Write to CompactFlash with mlfs_blockdev
+sudo mlfs_blockdev /dev/sdb write_image myfs.img
+
+# 4. Verify
 sudo mlfs_info /dev/sdb 0
 ```
 

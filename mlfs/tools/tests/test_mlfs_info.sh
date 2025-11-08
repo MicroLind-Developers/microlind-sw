@@ -8,14 +8,14 @@ echo "========================="
 echo ""
 
 # Build the tools if they don't exist
-if [ ! -f "../build/tools/mlfs_info" ]; then
+if [ ! -f "../../build/tools/mlfs_info/mlfs_info" ]; then
     echo "Building MLFS tools..."
-    cd ..
+    cd ../..
     mkdir -p build
     cd build
     cmake ..
     make tools
-    cd tools
+    cd tools/tests
     echo ""
 fi
 
@@ -63,30 +63,30 @@ ls documents/reports
 quit
 EOF
 
-if [ -f "../build/cli/mlfs" ]; then
+if [ -f "../../build/tools/cli/mlfs" ]; then
     echo "Running CLI to create test filesystem..."
-    ../build/cli/mlfs < test_commands.txt > /dev/null 2>&1
+    ../../build/tools/cli/mlfs < test_commands.txt > /dev/null 2>&1
     echo ""
 else
     echo "Error: MLFS CLI not found. Building entire project..."
-    cd ..
+    cd ../..
     mkdir -p build
     cd build  
     cmake ..
     make
-    cd tools
+    cd tools/tests
     echo ""
     
     # Try again
-    ../build/cli/mlfs < test_commands.txt > /dev/null 2>&1
+    ../../build/tools/cli/mlfs < test_commands.txt > /dev/null 2>&1
 fi
 
 # Test the mlfs_info tool
-if [ -f "../build/tools/mlfs_info" ] && [ -f "test_info.img" ]; then
+if [ -f "../../build/tools/mlfs_info/mlfs_info" ] && [ -f "test_info.img" ]; then
     echo "Running mlfs_info analysis..."
     echo "============================="
     echo ""
-    ../build/tools/mlfs_info test_info.img
+    ../../build/tools/mlfs_info/mlfs_info test_info.img
     echo ""
     echo "Test completed successfully!"
     echo ""
@@ -105,4 +105,4 @@ rm -f test_commands.txt test_info.img
 
 echo ""
 echo "Try running mlfs_info on your own MLFS images:"
-echo "  ../build/tools/mlfs_info <your_image_file.img>"
+echo "  ../../build/tools/mlfs_info/mlfs_info <your_image_file.img>"

@@ -1,7 +1,7 @@
 # Makefile for MLFS kernel module
 
 obj-m += mlfs.o
-mlfs-objs := mlfs_kernel.o
+mlfs-objs := mlfs_module.o mlfs_proc.o
 
 # Force use of system make (not any IDE/editor wrappers)
 MAKE := /usr/bin/make

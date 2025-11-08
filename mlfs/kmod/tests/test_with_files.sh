@@ -35,7 +35,7 @@ sudo chmod 777 "$TESTDIR"
 
 # Step 2: Create image with files
 echo -e "${GREEN}[2/7] Creating MLFS image with test files...${NC}"
-cd ../  # Go to mlfs root
+cd ../../  # Go to mlfs root (from kmod/tests)
 
 cat > /tmp/test_setup.mlfs << 'MLFS_EOF'
 format /tmp/mlfs_test/mlfs_with_files.img 32
@@ -64,7 +64,7 @@ exit
 MLFS_EOF
 
 echo "Running CLI to create filesystem with test files..."
-./build/cli/mlfs < /tmp/test_setup.mlfs
+./build/tools/cli/mlfs < /tmp/test_setup.mlfs
 
 echo ""
 echo -e "${BLUE}Image created successfully!${NC}"
@@ -74,7 +74,7 @@ ls -lh "$IMGFILE"
 # Step 3: Show what we created
 echo ""
 echo -e "${GREEN}[3/7] Image contents summary:${NC}"
-../../build/tools/mlfs_info/mlfs_info "$IMGFILE" 0 | head -40
+build/tools/mlfs_info/mlfs_info "$IMGFILE" 0 | head -40
 
 # Step 4: Identify CompactFlash device
 echo ""
@@ -130,7 +130,7 @@ sleep 2
 # Step 6: Load kernel module and mount
 echo ""
 echo -e "${GREEN}[6/7] Loading kernel module and mounting CompactFlash...${NC}"
-cd kmod
+cd mlfs/kmod
 sudo insmod mlfs.ko debug=1
 
 echo "Mounting $CF_DEVICE..."

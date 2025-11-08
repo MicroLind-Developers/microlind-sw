@@ -29,7 +29,7 @@ cmake ..
 make mlfs_cli
 ```
 
-The executable will be created as `build/cli/mlfs`.
+The executable will be created as `build/tools/cli/mlfs`.
 
 ## Usage
 

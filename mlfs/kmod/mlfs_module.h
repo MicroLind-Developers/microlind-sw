@@ -3,11 +3,14 @@
  * Data structures and definitions for the MLFS kernel driver
  */
 
-#ifndef _MLFS_KERNEL_H
-#define _MLFS_KERNEL_H
+#ifndef _MLFS_MODULE_H
+#define _MLFS_MODULE_H
 
 #include <linux/types.h>
 #include <linux/fs.h>
+
+/* Include proc filesystem support */
+#include "mlfs_proc.h"
 
 /* MLFS constants */
 #define MLFS_MAX_NAME 48
@@ -99,6 +102,9 @@ struct mlfs_sb_info {
     unsigned int dentries_per_block;
     unsigned int sectors_per_block;  /* 512-byte sectors per filesystem block */
     struct buffer_head *bitmap_bh;  /* Cached bitmap */
+    struct proc_dir_entry *proc_dir; /* Proc filesystem directory */
+    char device_name[64];             /* Device name for proc */
+    struct mlfs_stats stats;          /* Operation statistics */
 };
 
 /* Per-inode information */
@@ -123,5 +129,5 @@ struct inode *mlfs_iget(struct super_block *sb, struct mlfs_dentry *de,
                          unsigned long dir_block, int dentry_idx,
                          __u32 parent_dir_block, __u32 parent_dir_blocks);
 
-#endif /* _MLFS_KERNEL_H */
+#endif /* _MLFS_MODULE_H */
 

@@ -8,13 +8,14 @@ echo "============================="
 echo ""
 
 # Build the CLI if it doesn't exist
-if [ ! -f "./build/cli/mlfs" ]; then
+if [ ! -f "../../build/tools/cli/mlfs" ]; then
     echo "Building MLFS CLI..."
+    cd ../..
     mkdir -p build
     cd build
     cmake ..
     make
-    cd ..
+    cd tools/tests
     echo ""
 fi
 
@@ -144,8 +145,8 @@ echo "=================================="
 echo ""
 
 # Run the CLI with the test commands
-if [ -f "./build/cli/mlfs" ]; then
-    ./build/cli/mlfs < test_commands.txt
+if [ -f "../../build/tools/cli/mlfs" ]; then
+    ../../build/tools/cli/mlfs < test_commands.txt
 else
     echo "Error: MLFS CLI not found. Please build the project first."
     exit 1

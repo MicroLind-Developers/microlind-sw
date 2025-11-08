@@ -4,12 +4,13 @@
 echo "MLFS CLI Example Usage"
 echo "======================"
 
-# Build the CLI (assuming we're in the mlfs directory)
+# Build the CLI (assuming we're in the tools/cli directory)
 echo "Building MLFS CLI..."
+cd ../../
 mkdir -p build
 cd build
 cmake ..
-make mlfs_cli
+make
 
 if [ $? -eq 0 ]; then
     echo "✓ Build successful"
@@ -21,7 +22,7 @@ fi
 # Create example disk image
 echo ""
 echo "Creating example disk image..."
-./cli/mlfs << EOF
+./tools/cli/mlfs << EOF
 format example.img 32 4096
 mount example.img
 mkdir documents
@@ -40,7 +41,7 @@ EOF
 
 echo ""
 echo "Example completed! You can now run:"
-echo "  ./cli/mlfs example.img"
+echo "  ./tools/cli/mlfs example.img"
 echo ""
 echo "Or interactively:"
-echo "  ./cli/mlfs"
+echo "  ./tools/cli/mlfs"

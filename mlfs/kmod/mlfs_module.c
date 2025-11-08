@@ -19,12 +19,13 @@
 #include <linux/statfs.h>
 #include <linux/seq_file.h>
 
-#include "mlfs_kernel.h"
+#include "mlfs_module.h"
+#include "mlfs_proc.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("MicroLind Project");
 MODULE_DESCRIPTION("MLFS - MicroLind File System");
-MODULE_VERSION("0.1.0");
+MODULE_VERSION("0.4.0");
 
 /* Inode cache */
 struct kmem_cache *mlfs_inode_cachep;
@@ -85,6 +86,9 @@ static void mlfs_put_super(struct super_block *sb)
     MLFS_DEBUG("Unmounting filesystem\n");
     
     if (sbi) {
+        /* Remove proc filesystem entry */
+        mlfs_proc_destroy(sb);
+        
         if (sbi->bitmap_bh)
             brelse(sbi->bitmap_bh);
         kfree(sbi);
@@ -173,6 +177,9 @@ static struct dentry *mlfs_lookup(struct inode *dir, struct dentry *dentry,
     
     MLFS_DEBUG("Looking up '%s' in directory inode %lu\n", name, dir->i_ino);
     
+    /* Track directory lookup */
+    mlfs_stats_inc_lookup(&MLFS_SB(sb)->stats);
+    
     if (name_len > MLFS_MAX_NAME)
         return ERR_PTR(-ENAMETOOLONG);
     
@@ -210,6 +217,7 @@ static struct dentry *mlfs_lookup(struct inode *dir, struct dentry *dentry,
 static int mlfs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)
 {
     struct super_block *sb = dir->i_sb;
+    struct mlfs_sb_info *sbi = MLFS_SB(sb);
     struct mlfs_inode_info *dir_mi = MLFS_I(dir);
     struct mlfs_extent extent;
     struct inode *inode;
@@ -280,13 +288,16 @@ static int mlfs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry
     mark_inode_dirty(inode);
     d_instantiate(dentry, inode);
     
+    /* Track file creation */
+    mlfs_stats_inc_file_create(&sbi->stats);
+    
     return 0;
 }
 
 /*
  * Create a new directory
  */
-static struct dentry *mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
+static int mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
     struct super_block *sb = dir->i_sb;
     struct mlfs_inode_info *dir_mi = MLFS_I(dir);
@@ -299,18 +310,18 @@ static struct dentry *mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, str
     MLFS_DEBUG("mkdir: %s in dir inode %lu\n", name, dir->i_ino);
     
     if (dentry->d_name.len >= MLFS_MAX_NAME)
-        return ERR_PTR(-ENAMETOOLONG);
+        return -ENAMETOOLONG;
     
     /* Allocate 1 block for the directory */
     ret = mlfs_alloc_blocks(sb, 1, &extent);
     if (ret)
-        return ERR_PTR(ret);
+        return ret;
     
     /* Zero the allocated block */
     zero_block = kzalloc(MLFS_SB(sb)->block_size, GFP_KERNEL);
     if (!zero_block) {
         mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
-        return ERR_PTR(-ENOMEM);
+        return -ENOMEM;
     }
     
     for (i = 0; i < le32_to_cpu(extent.length); i++) {
@@ -318,7 +329,7 @@ static struct dentry *mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, str
         if (ret) {
             kfree(zero_block);
             mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
-            return ERR_PTR(ret);
+            return ret;
         }
     }
     kfree(zero_block);
@@ -328,7 +339,7 @@ static struct dentry *mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, str
                               name, 1, &extent, 0);
     if (ret) {
         mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
-        return ERR_PTR(ret);
+        return ret;
     }
     
     /* Create inode */
@@ -336,7 +347,7 @@ static struct dentry *mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, str
     if (!inode) {
         mlfs_dir_remove_entry(sb, dir_mi->first_block, dir_mi->block_count, name);
         mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
-        return ERR_PTR(-ENOMEM);
+        return -ENOMEM;
     }
     
     inode->i_ino = (dir_mi->first_block << 16) | 0;  /* Generate unique inode number */
@@ -357,7 +368,10 @@ static struct dentry *mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, str
     mark_inode_dirty(inode);
     d_instantiate(dentry, inode);
     
-    return NULL;  /* Success */
+    /* Track directory creation */
+    mlfs_stats_inc_dir_create(&MLFS_SB(sb)->stats);
+    
+    return 0;  /* Success */
 }
 
 /*
@@ -388,6 +402,9 @@ static int mlfs_unlink(struct inode *dir, struct dentry *dentry)
     mark_inode_dirty(inode);
     mark_inode_dirty(dir);
     
+    /* Track file deletion */
+    mlfs_stats_inc_file_delete(&MLFS_SB(sb)->stats);
+    
     return 0;
 }
 
@@ -406,6 +423,9 @@ static int mlfs_rmdir(struct inode *dir, struct dentry *dentry)
     
     /* Use unlink to do the work */
     drop_nlink(dir);  /* Remove .. entry */
+    
+    /* Track directory deletion */
+    mlfs_stats_inc_dir_delete(&MLFS_SB(inode->i_sb)->stats);
     
     return mlfs_unlink(dir, dentry);
 }
@@ -897,6 +917,11 @@ static ssize_t mlfs_read(struct file *filp, char __user *buf, size_t len, loff_t
     }
     
     *ppos = pos;
+    
+    /* Track read operation */
+    if (total_read > 0)
+        mlfs_stats_inc_read(&sbi->stats, total_read);
+    
     return total_read;
 }
 
@@ -978,6 +1003,11 @@ static ssize_t mlfs_write(struct file *filp, const char __user *buf, size_t len,
     }
     
     *ppos = pos;
+    
+    /* Track write operation */
+    if (total_written > 0)
+        mlfs_stats_inc_write(&sbi->stats, total_written);
+    
     return total_written;
 }
 
@@ -1259,6 +1289,9 @@ static int mlfs_fill_super(struct super_block *sb, void *data, int silent)
     sbi->partition_num = partition_num;
     sb->s_fs_info = sbi;
     
+    /* Initialize statistics counters */
+    mlfs_stats_init(&sbi->stats);
+    
     /* Set initial block size for reading partition table */
     sb_set_blocksize(sb, 512);
     
@@ -1313,6 +1346,13 @@ static int mlfs_fill_super(struct super_block *sb, void *data, int silent)
     pr_info("mlfs: Mounted partition %u (block size %lu, %u blocks)\n",
             partition_num, sbi->block_size, sbi->total_blocks);
     
+    /* Create proc filesystem entry */
+    ret = mlfs_proc_create(sb);
+    if (ret) {
+        pr_warn("mlfs: Failed to create proc entry (non-fatal)\n");
+        /* Continue anyway - this is not fatal */
+    }
+    
     return 0;
     
 failed_mount:
@@ -1360,7 +1400,12 @@ static int __init mlfs_init(void)
 {
     int ret;
     
-    pr_info("mlfs: MicroLind File System v0.3.0 (full read-write with create/delete)\n");
+    pr_info("mlfs: MicroLind File System v0.4.0 (full read-write with statistics)\n");
+    
+    /* Create proc filesystem root directory */
+    ret = mlfs_proc_init();
+    if (ret)
+        return ret;
     
     /* Register inode cache with constructor */
     mlfs_inode_cachep = kmem_cache_create("mlfs_inode_cache",
@@ -1368,14 +1413,17 @@ static int __init mlfs_init(void)
                                            0,
                                            SLAB_RECLAIM_ACCOUNT,  /* SLAB_MEM_SPREAD removed in kernel 6.9+ */
                                            mlfs_init_once);
-    if (!mlfs_inode_cachep)
+    if (!mlfs_inode_cachep) {
+        mlfs_proc_exit();
         return -ENOMEM;
+    }
     
     /* Register filesystem */
     ret = register_filesystem(&mlfs_fs_type);
     if (ret) {
         pr_err("mlfs: Failed to register filesystem\n");
         kmem_cache_destroy(mlfs_inode_cachep);
+        mlfs_proc_exit();
         return ret;
     }
     
@@ -1390,6 +1438,10 @@ static void __exit mlfs_exit(void)
 {
     unregister_filesystem(&mlfs_fs_type);
     kmem_cache_destroy(mlfs_inode_cachep);
+    
+    /* Remove proc filesystem root */
+    mlfs_proc_exit();
+    
     pr_info("mlfs: Filesystem unregistered\n");
 }
 

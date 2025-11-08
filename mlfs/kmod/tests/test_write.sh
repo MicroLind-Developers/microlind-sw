@@ -6,7 +6,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_DIR="${SCRIPT_DIR}/../build"
+BUILD_DIR="${SCRIPT_DIR}/../../build"
 CLI="${BUILD_DIR}/cli/mlfs"
 TEST_DIR="/tmp/mlfs_test"
 IMAGE="${TEST_DIR}/test_write.img"
@@ -68,7 +68,7 @@ sleep 1
 echo
 echo "Step 3: Loading kernel module..."
 sudo rmmod mlfs 2>/dev/null || true
-sudo insmod mlfs.ko || { echo "Failed to load module!"; exit 1; }
+sudo insmod "$SCRIPT_DIR/../mlfs.ko" || { echo "Failed to load module!"; exit 1; }
 
 echo
 echo "Step 4: Mounting filesystem..."
