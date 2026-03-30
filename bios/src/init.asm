@@ -7,7 +7,7 @@
     org $FF00
 
 HOOK_TRAP:
-    
+    jmp HANG    
 
 HOOK_FIRQ:
     ; jmp FIRQ_HANDLER
@@ -18,6 +18,8 @@ HOOK_IRQ:
 HOOK_SWI3:
 HOOK_SWI2:
 HOOK_SWI:
+    ; jmp PM_HANDLER
+    
 HOOK_NMI:
 HOOK_RESET:
     jmp INIT
@@ -30,7 +32,7 @@ INIT:
     
     ; Disable IRQ handler
     lda #$F0
-    sta $f404       
+    sta IRQ_BASE  
 
     ; Initialize the CPU to native mode
     ldmd #$01
@@ -43,13 +45,13 @@ INIT:
     ; 0x8000 - 0xBFFF = bank 2 -> 0x008000
     ; 0xC000 - 0xDFFF = bank 3 -> 0x00C000 (0xE000 - 0xFFFF = ROM)
     lda #$19
-	sta $f403
+	sta MMU_REG_3
 	clra
-    sta $f400
+    sta MMU_REG_0
     inca
-    sta $f401
+    sta MMU_REG_1
     inca
-    sta $f402
+    sta MMU_REG_2
 
     ; Set up the VALUE of the stack pointer
 	lds #$E000
@@ -99,9 +101,9 @@ CLEAR_REGS:
     rts
 
 
-; ; ------------------------------------------------------------------
-; ; Dummy subroutine for anything
-; ; ------------------------------------------------------------------
+; -----------------------------------------------------------------
+; Dummy subroutine for anything
+; -----------------------------------------------------------------
 ; DUMMY_SUBROUTINE:
 ;     ; DO NOTHING!
 ;     rts

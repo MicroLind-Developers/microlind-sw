@@ -8,32 +8,31 @@
 #define BIOS_RAM_START              (0xD800)
 
 //-----------------------------------------------------------------
-//Memory Mapper (MMU) 
-// Register Map $F400 - $F403
+// Memory Mapper (MMU) 
+//  Register Map $F400 - $F403
 //-----------------------------------------------------------------
 #define MMU_BASE                    (IO_BASE + 0)
-
 #define MMU_REG_0                   (MMU_BASE + 0)
 #define MMU_REG_1                   (MMU_BASE + 1)
 #define MMU_REG_2                   (MMU_BASE + 2)
 #define MMU_REG_3                   (MMU_BASE + 3)
 
 //-----------------------------------------------------------------
-//IRQ Handler
-//$F404
+// IRQ Handler
+//  Register Map $F404
 //-----------------------------------------------------------------
 #define IRQ_BASE (IO_BASE + 4)
 
 //-----------------------------------------------------------------
-//Spare 1 
-//$F405 - $F40F
+// Spare 1 
+//  Register Map $F405 - $F40F
 //-----------------------------------------------------------------
 #define SPARE_1_BASE (IO_BASE + 5)
 
 //-----------------------------------------------------------------
 // Real Time Clock (RTC)
-// Register Map $F418 - $F41F
-// Memory Map   None
+//  Register Map $F418 - $F41F
+//  Memory Map   None
 //-----------------------------------------------------------------
 #define RTC_BASE                    (IO_BASE + 18)
 #define RTC_YEAR                    (RTC_BASE + 0)
@@ -45,9 +44,9 @@
 
 //-----------------------------------------------------------------
 // Expansion Port
-// Register Map $F500 - $F7FF
-// Memory Map   $D800 - $D81F
-// Buffer       None
+//  Register Map $F500 - $F7FF
+//  Memory Map   $D800 - $D81F
+//  Buffer       None
 //-----------------------------------------------------------------
 #define EXPANSION_PORT_BASE             (IO_BASE + 256)
 #define EXPANSION_DRIVER_RAM_START      (BIOS_RAM_START)
@@ -55,9 +54,9 @@
 
 //-----------------------------------------------------------------
 // Serial (XR88C92)
-// Register Map $F430 - $F43F 
-// Memory Map   $D820 - $D83F
-// Buffer       $D000 - $D400
+//  Register Map $F430 - $F43F 
+//  Memory Map   $D820 - $D83F
+//  Buffer       $D000 - $D400
 //-----------------------------------------------------------------
 #define SERIAL_BASE                     (IO_BASE + 48)
 #define SERIAL_DRIVER_RAM_START         (EXPANSION_DRIVER_RAM_START + EXPANSION_DRIVER_RAM_SIZE)
@@ -100,9 +99,9 @@
 
 //-----------------------------------------------------------------
 // Compact Flash
-// Register Map $F420 - $F42F
-// Memory Map   $D840 - $D85F
-// Buffer       $D400 - $D600
+//  Register Map $F420 - $F42F
+//  Memory Map   $D840 - $D85F
+//  Buffer       $D400 - $D600
 //-----------------------------------------------------------------
 #define CF_BASE                         (IO_BASE + 24)
 #define STORAGE_DRIVER_RAM_START        (SERIAL_DRIVER_RAM_START + SERIAL_DRIVER_RAM_SIZE)
@@ -123,9 +122,9 @@
 
 //-----------------------------------------------------------------
 // Parallel (VIA)
-// Register Map $F420 - $F42F
-// Memory Map   $D860 - $D87F
-// Buffer       None
+//  Register Map $F420 - $F42F
+//  Memory Map   $D860 - $D87F
+//  Buffer       None
 //-----------------------------------------------------------------
 #define PARALLEL_BASE                   (IO_BASE + 32)
 #define JOYSTICK_DRIVER_RAM_START       (STORAGE_DRIVER_RAM_START + STORAGE_DRIVER_RAM_SIZE)
@@ -151,11 +150,11 @@
 
 //-----------------------------------------------------------------
 // Keyboard (PS/2)
-// Register Map $F410 - $F417
-// Memory Map   $D880 - $D89F : Keyboard 
-//              $D8A0 - $D8BF : Mouse
-// Buffer       $D600 - $D640 : Keyboard
-//              $D640 - $D680 : Mouse
+//  Register Map $F410 - $F417
+//  Memory Map   $D880 - $D89F : Keyboard 
+//               $D8A0 - $D8BF : Mouse
+//  Buffer       $D600 - $D640 : Keyboard
+//               $D640 - $D680 : Mouse
 //-----------------------------------------------------------------
 #define PS2_BASE                        (IO_BASE + 16)
 #define KEYBOARD_DRIVER_RAM_START       (JOYSTICK_DRIVER_RAM_START + JOYSTICK_DRIVER_RAM_SIZE)
@@ -170,24 +169,24 @@
 
 #define PS2_KBD                         (PS2_BASE + 0) // Keypress / Kbd command
 #define PS2_MOUSE                       (PS2_BASE + 1) // Mouse
+
 //-----------------------------------------------------------------
 // Graphics
-// Register Map $F440 - $F47F
-// Memory Map   $D8A0 - $D8DF
-// Buffer       $CC00 - $D000
+//  Register Map $F440 - $F47F
+//  Memory Map   $D8A0 - $D8DF
+//  Buffer       $CC00 - $D000
 //-----------------------------------------------------------------
 #define GRAPHICS_BASE                   (IO_BASE + 64)
-
 #define VIDEO_DRIVER_RAM_START          (MOUSE_DRIVER_RAM_START + MOUSE_DRIVER_RAM_SIZE)
 #define VIDEO_DRIVER_RAM_SIZE           (64)
 #define VIDEO_BUFFER_START 	            (0xCC00)
 #define VIDEO_BUFFER_SIZE 	            (1024)
 
 //-----------------------------------------------------------------
-//Audio
-// Register Map $F480 - $F4BF
-// Memory Map   $D8E0 - $D8FF
-// Buffer       $C800 - $CC00
+// Audio
+//  Register Map $F480 - $F4BF
+//  Memory Map   $D8E0 - $D8FF
+//  Buffer       $C800 - $CC00
 //-----------------------------------------------------------------
 #define AUDIO_BASE                      (IO_BASE + 128)
 #define AUDIO_DRIVER_RAM_START          (VIDEO_DRIVER_RAM_START + VIDEO_DRIVER_RAM_SIZE)
@@ -196,10 +195,10 @@
 #define AUDIO_BUFFER_SIZE 	            (1024)
 
 //-----------------------------------------------------------------
-//Spare 2
-// Register Map $F4C0 - $F4FF
-// Memory Map   None
-// Buffer       None
+// Spare 2
+//  Register Map $F4C0 - $F4FF
+//  Memory Map   None
+//  Buffer       None
 //-----------------------------------------------------------------
 #define SPARE_2_BASE                    (IO_BASE + 192)
 
