@@ -34,6 +34,17 @@ void teardown_filesystem_test(void)
     }
 }
 
+// Test fixed on-disk structure sizes used by the bootloader and kernel module
+START_TEST(test_ondisk_structure_sizes)
+{
+    ck_assert_int_eq(sizeof(mlpt_entry_t), 24);
+    ck_assert_int_eq(sizeof(mlpt_t), 512);
+    ck_assert_int_eq(sizeof(mlfs_extent_t), 8);
+    ck_assert_int_eq(sizeof(mlfs_dentry_t), 128);
+    ck_assert_int_eq(sizeof(mlfs_superblock_t), 512);
+}
+END_TEST
+
 // Test basic mkfs operation
 START_TEST(test_mkfs_basic)
 {
@@ -311,6 +322,7 @@ Suite *filesystem_suite(void)
     // validation tests
     tc_validation = tcase_create("Validation");
     tcase_add_checked_fixture(tc_validation, setup_filesystem_test, teardown_filesystem_test);
+    tcase_add_test(tc_validation, test_ondisk_structure_sizes);
     tcase_add_test(tc_validation, test_superblock_validation);
     suite_add_tcase(s, tc_validation);
 

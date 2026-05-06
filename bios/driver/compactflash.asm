@@ -1,82 +1,238 @@
 ; -----------------------------------------------------------------
-; Compact Flash Bios functions for µLind
+; CompactFlash BIOS functions for MicroLind
 ; -----------------------------------------------------------------
-; Copyright Eric & Linus Lind 2025
-;   
+; Copyright Eric & Linus Lind 2026
+;
+; CF access is currently byte-wide PIO, LBA28 only. The routines use
+; carry clear for success and carry set for failure.
 
+        IFNDEF IO_INC
+            include "../include/io.inc"
+        ENDC
+        IFNDEF MEMORY_INC
+            include "../include/memory.inc"
+        ENDC
 
+; -----------------------------------------------------------------
+; CompactFlash register map
+; -----------------------------------------------------------------
 
-; This is an example, not production code. It is not tested and may not work as expected.
+CF_DATA                 EQU     CF_BASE+$00
+CF_ERROR                EQU     CF_BASE+$01
+CF_FEATURES             EQU     CF_BASE+$01
+CF_SECTOR_COUNT         EQU     CF_BASE+$02
+CF_LBA0                 EQU     CF_BASE+$03
+CF_LBA1                 EQU     CF_BASE+$04
+CF_LBA2                 EQU     CF_BASE+$05
+CF_DRIVE_HEAD           EQU     CF_BASE+$06
+CF_STATUS               EQU     CF_BASE+$07
+CF_COMMAND              EQU     CF_BASE+$07
 
+; -----------------------------------------------------------------
+; Status bits and commands
+; -----------------------------------------------------------------
 
+CF_STATUS_ERR           EQU     $01
+CF_STATUS_DRQ           EQU     $08
+CF_STATUS_DF            EQU     $20
+CF_STATUS_RDY           EQU     $40
+CF_STATUS_BUSY          EQU     $80
 
-; ; Minimal CompactFlash Sector Read Example for 6809/6309
-; ; Target: microLind system CF interface
+CF_CMD_READ_SECTOR      EQU     $20
 
-;     org $F000
+CF_LBA_MASTER           EQU     $E0
+CF_WAIT_TIMEOUT         EQU     $FFFF
 
-; ; --- CompactFlash Register Map (example) ---
-; CF_DATA         equ $F800   ; Data register (read/write)
-; CF_ERROR        equ $F801   ; Error register (read only)
-; CF_FEATURES     equ $F801   ; Features register (write only)
-; CF_SECTOR_COUNT equ $F802
-; CF_LBA0         equ $F803
-; CF_LBA1         equ $F804
-; CF_LBA2         equ $F805
-; CF_DRIVE_HEAD   equ $F806
-; CF_STATUS       equ $F807   ; Status register (read)
-; CF_COMMAND      equ $F807   ; Command register (write)
+; -----------------------------------------------------------------
+; Return codes in A
+; -----------------------------------------------------------------
 
-; ; --- RAM Buffer for 1 Sector (512 bytes) ---
-;     org $0100
-; CF_SECTOR_BUFFER rmb 512
+CF_OK                   EQU     $00
+CF_ERR_TIMEOUT          EQU     $01
+CF_ERR_DEVICE           EQU     $02
 
-; ; --- Constants ---
-; CF_STATUS_DRQ   equ $08      ; Data Request bit
-; CF_STATUS_BUSY  equ $80      ; Busy bit
+; -----------------------------------------------------------------
+; CF_INIT
+; Select the primary CF device and wait until it is ready.
+;
+; Out:
+;   C clear, A=CF_OK on success
+;   C set,   A=error code on failure
+; Clobbers:
+;   A,U,CC
+; -----------------------------------------------------------------
 
-; ; --- Code Starts ---
+CF_INIT:
+        lda     #CF_LBA_MASTER
+        sta     CF_DRIVE_HEAD
+        jsr     CF_WAIT_READY
+        rts
 
-; read_sector_0:
-;     ; Setup LBA to 0
-;     lda #$00
-;     sta CF_LBA0
-;     sta CF_LBA1
-;     sta CF_LBA2
+; -----------------------------------------------------------------
+; CF_READ_SECTOR_BUFFER
+; Read one 512-byte sector into STORAGE_BUFFER_START.
+;
+; In:
+;   Q = 28-bit LBA, bits 31..28 must be zero
+; Out:
+;   C clear, A=CF_OK on success
+;   C set,   A=error code on failure
+; Clobbers:
+;   A,X,Y,U,CC
+; -----------------------------------------------------------------
 
-;     ; Drive/Head register: LBA mode (bit 6 = 1), drive 0 (bit 4 = 0)
-;     lda #$E0        ; 1110 0000b = LBA mode, drive 0
-;     sta CF_DRIVE_HEAD
+CF_READ_SECTOR_BUFFER:
+        ldx     #STORAGE_BUFFER_START
+        bra     CF_READ_SECTOR
 
-;     ; Request to read 1 sector
-;     lda #$01
-;     sta CF_SECTOR_COUNT
+; -----------------------------------------------------------------
+; CF_READ_SECTOR
+; Read one 512-byte sector into caller-provided memory.
+;
+; In:
+;   Q = 28-bit LBA, bits 31..28 must be zero
+;   X = destination buffer, at least 512 bytes
+; Out:
+;   C clear, A=CF_OK on success
+;   C set,   A=error code on failure
+; Clobbers:
+;   A,X,Y,U,CC
+; -----------------------------------------------------------------
 
-;     ; Issue READ SECTOR command
-;     lda #$20
-;     sta CF_COMMAND
+CF_READ_SECTOR:
+        pshs    y,u
+        leas    -4,s
+        stq     0,s
 
-; .wait_not_busy:
-;     lda CF_STATUS
-;     bita #CF_STATUS_BUSY
-;     bne .wait_not_busy   ; Wait while Busy
+        jsr     CF_WAIT_READY
+        bcs     _CF_READ_DONE
 
-; .wait_drq:
-;     lda CF_STATUS
-;     bita #CF_STATUS_DRQ
-;     beq .wait_drq        ; Wait until DRQ is set
+        lda     0,s
+        anda    #$F0
+        beq     _CF_READ_LBA_OK
+        lda     #CF_ERR_DEVICE
+        orcc    #$01
+        bra     _CF_READ_DONE
 
-;     ; Now ready to read 512 bytes
-;     ldx #CF_SECTOR_BUFFER
-;     ldb #$00             ; 512 byte counter (high byte)
-;     ldy #512             ; Number of bytes to read
+_CF_READ_LBA_OK:
+        lda     #$01
+        sta     CF_SECTOR_COUNT
+        lda     3,s
+        sta     CF_LBA0
+        lda     2,s
+        sta     CF_LBA1
+        lda     1,s
+        sta     CF_LBA2
+        lda     0,s
+        anda    #$0F
+        ora     #CF_LBA_MASTER
+        sta     CF_DRIVE_HEAD
 
-; .read_loop:
-;     lda CF_DATA          ; Read one byte from CF
-;     sta ,x+
-;     leay -1,y
-;     bne .read_loop
+        lda     #CF_CMD_READ_SECTOR
+        sta     CF_COMMAND
 
-;     rts
+        jsr     CF_WAIT_DRQ
+        bcs     _CF_READ_DONE
 
-; ; --- End of File ---
+        ldy     #STORAGE_BUFFER_SIZE
+_CF_READ_LOOP:
+        lda     CF_DATA
+        sta     ,x+
+        leay    -1,y
+        bne     _CF_READ_LOOP
+
+        clra
+        andcc   #$FE
+
+_CF_READ_DONE:
+        leas    4,s
+        puls    y,u,pc
+
+; -----------------------------------------------------------------
+; CF_WAIT_NOT_BUSY
+; Wait until BSY clears.
+;
+; Out:
+;   C clear, A=CF_OK on success
+;   C set,   A=CF_ERR_TIMEOUT on timeout
+; Clobbers:
+;   A,U,CC
+; -----------------------------------------------------------------
+
+CF_WAIT_NOT_BUSY:
+        ldu     #CF_WAIT_TIMEOUT
+_CF_WNB_LOOP:
+        lda     CF_STATUS
+        bita    #CF_STATUS_BUSY
+        beq     _CF_WAIT_OK
+        leau    -1,u
+        bne     _CF_WNB_LOOP
+        lda     #CF_ERR_TIMEOUT
+        orcc    #$01
+        rts
+
+; -----------------------------------------------------------------
+; CF_WAIT_READY
+; Wait until BSY clears and RDY is set.
+;
+; Out:
+;   C clear, A=CF_OK on success
+;   C set,   A=CF_ERR_TIMEOUT on timeout
+; Clobbers:
+;   A,U,CC
+; -----------------------------------------------------------------
+
+CF_WAIT_READY:
+        ldu     #CF_WAIT_TIMEOUT
+_CF_WRDY_LOOP:
+        lda     CF_STATUS
+        bita    #CF_STATUS_BUSY
+        bne     _CF_WRDY_NEXT
+        bita    #CF_STATUS_RDY
+        bne     _CF_WAIT_OK
+_CF_WRDY_NEXT:
+        leau    -1,u
+        bne     _CF_WRDY_LOOP
+        lda     #CF_ERR_TIMEOUT
+        orcc    #$01
+        rts
+
+; -----------------------------------------------------------------
+; CF_WAIT_DRQ
+; Wait until a read command has data ready.
+;
+; Out:
+;   C clear, A=CF_OK on success
+;   C set,   A=error code on failure
+; Clobbers:
+;   A,U,CC
+; -----------------------------------------------------------------
+
+CF_WAIT_DRQ:
+        ldu     #CF_WAIT_TIMEOUT
+_CF_WDRQ_LOOP:
+        lda     CF_STATUS
+        bita    #CF_STATUS_BUSY
+        bne     _CF_WDRQ_NEXT
+        bita    #CF_STATUS_ERR|CF_STATUS_DF
+        bne     _CF_WDRQ_DEVICE_ERROR
+        bita    #CF_STATUS_DRQ
+        bne     _CF_WAIT_OK
+_CF_WDRQ_NEXT:
+        leau    -1,u
+        bne     _CF_WDRQ_LOOP
+        lda     #CF_ERR_TIMEOUT
+        orcc    #$01
+        rts
+
+_CF_WDRQ_DEVICE_ERROR:
+        lda     #CF_ERR_DEVICE
+        orcc    #$01
+        rts
+
+_CF_WAIT_OK:
+        clra
+        andcc   #$FE
+        rts
+
+; --- End of File ---

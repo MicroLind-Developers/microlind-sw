@@ -73,6 +73,32 @@ INIT:
     ; This is a message that will be printed to the serial port
     ldx #msg_init
     jsr SERIAL_PRINT_A
+    
+    ; Detect installed 512 KiB RAM chips and store the count in config RAM.
+    jsr CONFIG_DETECT_RAM_CHIPS
+    ; Print detected RAM chip count
+    ldx #msg_mem_detect
+    jsr SERIAL_PRINT_A
+    lda CONFIG_RAM_CHIP_COUNT
+    jsr SERIAL_PRINT_DECIMAL_A  
+    ldx #msg_line_break
+    jsr SERIAL_PRINT_A
+    
+
+    ; Initialize the CompactFlash card
+    ; if carry clear, CF_OK in A, card is ready for use
+    jsr CF_INIT
+    ; if carry not clear jump to _NO_CF to skip
+    ldx #$01
+    stx CONFIG_CF_PRESENT_FLAG
+    ldx #msg_cf_present
+    jsr SERIAL_PRINT_A
+    jmp _END_CF
+
+_NO_CF:
+    ldx #msg_no_cf
+    jsr SERIAL_PRINT_A
+_END_CF:
 
     lbra _START
 
@@ -81,7 +107,6 @@ INIT:
 ; input:            None
 ; output:           None
 ; -----------------------------------------------------------------
-    export HANG
 HANG:
     bra HANG
 
@@ -100,7 +125,6 @@ CLEAR_REGS:
     tfr     d,v
     rts
 
-
 ; -----------------------------------------------------------------
 ; Dummy subroutine for anything
 ; -----------------------------------------------------------------
@@ -110,6 +134,20 @@ CLEAR_REGS:
 
 msg_init:
     fcc "Initializing µLind..."
+    fcb 10,13,0
+
+msg_mem_detect:
+    fcc "Detected RAM chips: "
+
+msg_cf_present:
+    fcc " * CompactFlash card detected and initialized."
+    fcb 10,13,0
+
+msg_no_cf:
+    fcc " * No CompactFlash card detected or initialization failed."   
+    fcb 10,13,0
+
+msg_line_break:
     fcb 10,13,0
 
 ; -----------------------------------------------------------------

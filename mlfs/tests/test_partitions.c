@@ -54,6 +54,32 @@ START_TEST(test_make_empty_partition_table)
 }
 END_TEST
 
+// Test partition table is encoded big-endian on disk
+START_TEST(test_partition_table_big_endian_disk_format)
+{
+    ck_assert_mlfs_ok(mlfs_make_empty_partition_table(&test_io));
+    ck_assert_mlfs_ok(mlfs_add_partition(&test_io, 0x01020304u, 0x05060708u, 12, "be"));
+
+    const uint8_t *sec = test_disk.mem;
+    ck_assert_int_eq(sec[0], 0x4D); // MLPT magic, big-endian
+    ck_assert_int_eq(sec[1], 0x4C);
+    ck_assert_int_eq(sec[2], 0x50);
+    ck_assert_int_eq(sec[3], 0x54);
+    ck_assert_int_eq(sec[7], 0x00); // count = 1, big-endian
+    ck_assert_int_eq(sec[8], 0x01);
+
+    const uint8_t *entry = sec + 9;
+    ck_assert_int_eq(entry[0], 0x01); // start_lba = 0x01020304
+    ck_assert_int_eq(entry[1], 0x02);
+    ck_assert_int_eq(entry[2], 0x03);
+    ck_assert_int_eq(entry[3], 0x04);
+    ck_assert_int_eq(entry[4], 0x05); // block_count = 0x05060708
+    ck_assert_int_eq(entry[5], 0x06);
+    ck_assert_int_eq(entry[6], 0x07);
+    ck_assert_int_eq(entry[7], 0x08);
+}
+END_TEST
+
 // Test adding single partition
 START_TEST(test_add_single_partition)
 {
@@ -249,6 +275,7 @@ Suite *partition_suite(void)
     tc_create = tcase_create("Creation");
     tcase_add_checked_fixture(tc_create, setup_partition_test, teardown_partition_test);
     tcase_add_test(tc_create, test_make_empty_partition_table);
+    tcase_add_test(tc_create, test_partition_table_big_endian_disk_format);
     tcase_add_test(tc_create, test_make_single_partition);
     suite_add_tcase(s, tc_create);
 

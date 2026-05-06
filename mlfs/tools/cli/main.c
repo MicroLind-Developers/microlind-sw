@@ -123,18 +123,6 @@ char **command_completion(const char *text, int start, int end)
     if(start == 0) {
         matches = rl_completion_matches(text, rl_filename_completion_function);
 
-        // Add our commands to the completion list
-        static char *command_names[sizeof(commands) / sizeof(commands[0]) + 1];
-        static int initialized = 0;
-
-        if(!initialized) {
-            for(int i = 0; i < num_commands; i++) {
-                command_names[i] = (char *)commands[i].name;
-            }
-            command_names[num_commands] = NULL;
-            initialized = 1;
-        }
-
         // Simple command name completion
         int len = strlen(text);
         for(int i = 0; i < num_commands; i++) {

@@ -64,6 +64,7 @@ uint8_t irq_get_current_filter(void);
 typedef void (*bios_vfn)(void);
 typedef void (*bios_vfn_pchar)(const char*);
 typedef void (*bios_vfn_u8)(uint8_t);
+typedef void (*bios_vfn_u8_u8)(uint8_t, uint8_t);
 typedef void (*bios_vfn_buf_u16)(char*, uint16_t);
 typedef void (*bios_vfn_u16)(uint16_t);
 
@@ -71,50 +72,53 @@ typedef void (*bios_vfn_u16)(uint16_t);
 #define BIOS_JUMPTAB_BASE 0xF800u
 #endif
 
-#define bios_serial_init          ((bios_vfn        )(BIOS_JUMPTAB_BASE + 0))
-#define bios_serial_start         ((bios_vfn        )(BIOS_JUMPTAB_BASE + 2))
-#define bios_serial_print         ((bios_vfn_pchar  )(BIOS_JUMPTAB_BASE + 4))
-#define bios_serial_putc          ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 6))
-#define bios_serial_input         ((bios_vfn_buf_u16)(BIOS_JUMPTAB_BASE + 8))
-#define bios_serial_print_byte    ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 10))
-#define bios_serial_print_byte_hex((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 12))
-#define bios_serial_print_word_hex((bios_vfn_u16    )(BIOS_JUMPTAB_BASE + 14))
-#define bios_serial_print_crlf    ((bios_vfn        )(BIOS_JUMPTAB_BASE + 16))
-#define bios_serial_set_ct        ((bios_vfn_u16    )(BIOS_JUMPTAB_BASE + 18))
-#define bios_serial_set_ct_mode   ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 20))
-#define bios_serial_enable_ct_irq ((bios_vfn        )(BIOS_JUMPTAB_BASE + 22))
-#define bios_serial_start_ct      ((bios_vfn        )(BIOS_JUMPTAB_BASE + 24))
-#define bios_serial_stop_ct       ((bios_vfn        )(BIOS_JUMPTAB_BASE + 26))
-#define bios_set_led              ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 28))
-#define bios_set_led_red          ((bios_vfn        )(BIOS_JUMPTAB_BASE + 30))
-#define bios_set_led_green        ((bios_vfn        )(BIOS_JUMPTAB_BASE + 32))
-#define bios_set_led_blue         ((bios_vfn        )(BIOS_JUMPTAB_BASE + 34))
-#define bios_set_led_off          ((bios_vfn        )(BIOS_JUMPTAB_BASE + 36))
+#define BIOS_JUMPTAB_ENTRY_SIZE 3u
+#define BIOS_JUMPTAB_ADDR(index) (BIOS_JUMPTAB_BASE + ((index) * BIOS_JUMPTAB_ENTRY_SIZE))
 
-#define bios_mmu_init             ((bios_vfn        )(BIOS_JUMPTAB_BASE + 38))
-#define bios_mmu_set_register     ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 40)) /* note: expects (reg,val) via stack; see caution */
-#define bios_mmu_set_register_0   ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 42))
-#define bios_mmu_set_register_1   ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 44))
-#define bios_mmu_set_register_2   ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 46))
-#define bios_mmu_set_register_3   ((bios_vfn_u8     )(BIOS_JUMPTAB_BASE + 48))
-#define bios_mmu_get_register     ((uint8_t (*)(uint8_t))(BIOS_JUMPTAB_BASE + 50))
-#define bios_mmu_get_register_0   ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 52))
-#define bios_mmu_get_register_1   ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 54))
-#define bios_mmu_get_register_2   ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 56))
-#define bios_mmu_get_register_3   ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 58))
+#define bios_serial_init          ((bios_vfn        )BIOS_JUMPTAB_ADDR(0))
+#define bios_serial_start         ((bios_vfn        )BIOS_JUMPTAB_ADDR(1))
+#define bios_serial_print         ((bios_vfn_pchar  )BIOS_JUMPTAB_ADDR(2))
+#define bios_serial_putc          ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(3))
+#define bios_serial_input         ((bios_vfn_buf_u16)BIOS_JUMPTAB_ADDR(4))
+#define bios_serial_print_byte    ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(5))
+#define bios_serial_print_byte_hex ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(6))
+#define bios_serial_print_word_hex ((bios_vfn_u16    )BIOS_JUMPTAB_ADDR(7))
+#define bios_serial_print_crlf    ((bios_vfn        )BIOS_JUMPTAB_ADDR(8))
+#define bios_serial_set_ct        ((bios_vfn_u16    )BIOS_JUMPTAB_ADDR(9))
+#define bios_serial_set_ct_mode   ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(10))
+#define bios_serial_enable_ct_irq ((bios_vfn        )BIOS_JUMPTAB_ADDR(11))
+#define bios_serial_start_ct      ((bios_vfn        )BIOS_JUMPTAB_ADDR(12))
+#define bios_serial_stop_ct       ((bios_vfn        )BIOS_JUMPTAB_ADDR(13))
+#define bios_set_led              ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(14))
+#define bios_set_led_red          ((bios_vfn        )BIOS_JUMPTAB_ADDR(15))
+#define bios_set_led_green        ((bios_vfn        )BIOS_JUMPTAB_ADDR(16))
+#define bios_set_led_blue         ((bios_vfn        )BIOS_JUMPTAB_ADDR(17))
+#define bios_set_led_off          ((bios_vfn        )BIOS_JUMPTAB_ADDR(18))
 
-#define bios_parallel_init                ((bios_vfn)(BIOS_JUMPTAB_BASE + 60))
-#define bios_parallel_enable_timer_interrupt ((bios_vfn)(BIOS_JUMPTAB_BASE + 62))
-#define bios_parallel_disable_timer_interrupt ((bios_vfn)(BIOS_JUMPTAB_BASE + 64))
-#define bios_parallel_reset_interrupt     ((bios_vfn)(BIOS_JUMPTAB_BASE + 66))
-#define bios_parallel_get_port_a          ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 68))
-#define bios_read_joy1                    ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 70))
-#define bios_read_joy2                    ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 72))
+#define bios_mmu_init             ((bios_vfn        )BIOS_JUMPTAB_ADDR(19))
+#define bios_mmu_set_register     ((bios_vfn_u8_u8  )BIOS_JUMPTAB_ADDR(20))
+#define bios_mmu_set_register_0   ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(21))
+#define bios_mmu_set_register_1   ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(22))
+#define bios_mmu_set_register_2   ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(23))
+#define bios_mmu_set_register_3   ((bios_vfn_u8     )BIOS_JUMPTAB_ADDR(24))
+#define bios_mmu_get_register     ((uint8_t (*)(uint8_t))BIOS_JUMPTAB_ADDR(25))
+#define bios_mmu_get_register_0   ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(26))
+#define bios_mmu_get_register_1   ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(27))
+#define bios_mmu_get_register_2   ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(28))
+#define bios_mmu_get_register_3   ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(29))
 
-#define bios_irq_init                     ((bios_vfn)(BIOS_JUMPTAB_BASE + 74))
-#define bios_irq_set_filter               ((bios_vfn_u8)(BIOS_JUMPTAB_BASE + 76))
-#define bios_irq_get_active               ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 78))
-#define bios_irq_get_current_filter       ((uint8_t (*)(void))(BIOS_JUMPTAB_BASE + 80))
+#define bios_parallel_init                   ((bios_vfn)(BIOS_JUMPTAB_ADDR(30)))
+#define bios_parallel_enable_timer_interrupt ((bios_vfn)(BIOS_JUMPTAB_ADDR(31)))
+#define bios_parallel_disable_timer_interrupt ((bios_vfn)(BIOS_JUMPTAB_ADDR(32)))
+#define bios_parallel_reset_interrupt        ((bios_vfn)(BIOS_JUMPTAB_ADDR(33)))
+#define bios_parallel_get_port_a             ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(34))
+#define bios_read_joy1                       ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(35))
+#define bios_read_joy2                       ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(36))
+
+#define bios_irq_init                     ((bios_vfn)BIOS_JUMPTAB_ADDR(37))
+#define bios_irq_set_filter               ((bios_vfn_u8)BIOS_JUMPTAB_ADDR(38))
+#define bios_irq_get_active               ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(39))
+#define bios_irq_get_current_filter       ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(40))
 
 #endif /* MICROLIND_USE_BIOS_JUMPTAB */
 

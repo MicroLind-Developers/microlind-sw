@@ -1,7 +1,7 @@
 ; -----------------------------------------------------------------
 ; Bios init functions for µLind
 ; -----------------------------------------------------------------
-; Copyright Eric & Linus Lind 2024
+; Copyright Eric & Linus Lind 2026
 ;
 
 ; Jumptable for BIOS functions
@@ -41,11 +41,13 @@ _PRINT_MENU:
     jsr SERIAL_PRINT_A
     ldx #msg_text4
     jsr SERIAL_PRINT_A
+    ldx #msg_text5
+    jsr SERIAL_PRINT_A
     ldx #msg_line3
     jsr SERIAL_PRINT_A
-    ldx msg_crlf0
+    ldx #msg_crlf0
     jsr SERIAL_PRINT_A
-    ldx #msg_text5
+    ldx #msg_prompt0
     jsr SERIAL_PRINT_A
 
 
@@ -61,8 +63,9 @@ msg_text0: fcn "│    »»» µLind BIOS Utility Menu «««    │"
 msg_text1: fcn "│ 1. Ram test utility                   │"
 msg_text2: fcn "│ 2. Serial port test utility           │"
 msg_text3: fcn "│ 3. Memory dump utility                │"
-msg_text4: fcn "│ 4. Joystic ports test utility         │" 
-msg_text5: fcn "  Press a number to continue... "
+msg_text4: fcn "│ 4. Joystic ports test utility         │"
+msg_text5: fcn "│ 5. Boot MLOS from CF                  │" 
+msg_prompt0: fcn "  Press a number to continue... "
 
 msg_init0: fcn "µLind BIOS Utility Menu"
 

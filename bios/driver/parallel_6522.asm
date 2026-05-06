@@ -10,8 +10,6 @@
         include "../include/memory.inc"
     ENDC
 
-PARALLEL_BASE IMPORT
-
 PARALLEL_ORB            EQU PARALLEL_BASE+0
 PARALLEL_IRB            EQU PARALLEL_BASE+0
 PARALLEL_ORA            EQU PARALLEL_BASE+1
@@ -33,6 +31,7 @@ PARALLEL_IER            EQU PARALLEL_BASE+14
 TIMER_1_IRQ             EQU $40
 
 SPI_TFR_READY           EQU $0000 ; Hold the SPI transfer ready flag
+MAX_TFR_RETRIES         EQU $FF
 
 
 ; -----------------------------------------------------------------
@@ -205,7 +204,7 @@ PARALLEL_START_SPI_DATA_STREAM:
         LDA SPI_TFR_READY
         BNE _SPI_TFR_RETRY
 
-        LDE MAX_TFR_RETRIES+1
+        LDE #MAX_TFR_RETRIES
 _SPI_TFR_RETRY:
         TFR E,B
         DECB

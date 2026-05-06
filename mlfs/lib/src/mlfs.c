@@ -47,6 +47,176 @@ static void mlfs_fill_uuid(uint32_t out[4])
         out[i] = (uint32_t)rand() ^ ((uint32_t)rand() << 16) ^ (uint32_t)clock();
 }
 
+// ---- on-disk big-endian encoding helpers ----
+static uint16_t mlfs_get_be16(const uint8_t* p)
+{
+    return ((uint16_t)p[0] << 8) | (uint16_t)p[1];
+}
+
+static uint32_t mlfs_get_be32(const uint8_t* p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+}
+
+static void mlfs_put_be16(uint8_t* p, uint16_t v)
+{
+    p[0] = (uint8_t)(v >> 8);
+    p[1] = (uint8_t)v;
+}
+
+static void mlfs_put_be32(uint8_t* p, uint32_t v)
+{
+    p[0] = (uint8_t)(v >> 24);
+    p[1] = (uint8_t)(v >> 16);
+    p[2] = (uint8_t)(v >> 8);
+    p[3] = (uint8_t)v;
+}
+
+static void mlfs_decode_extent(const uint8_t* src, mlfs_extent_t* dst)
+{
+    dst->start  = mlfs_get_be32(src + 0);
+    dst->length = mlfs_get_be32(src + 4);
+}
+
+static void mlfs_encode_extent(uint8_t* dst, const mlfs_extent_t* src)
+{
+    mlfs_put_be32(dst + 0, src->start);
+    mlfs_put_be32(dst + 4, src->length);
+}
+
+static void mlfs_decode_dentry(const uint8_t* src, mlfs_dentry_t* dst)
+{
+    memset(dst, 0, sizeof(*dst));
+    dst->in_use        = src[0];
+    dst->flags         = src[1];
+    dst->size_bytes    = mlfs_get_be32(src + 2);
+    dst->mtime         = mlfs_get_be32(src + 6);
+    dst->ctime         = mlfs_get_be32(src + 10);
+    dst->extents_used  = src[14];
+    dst->extents_total = src[15];
+    memcpy(dst->name, src + 16, MLFS_MAX_NAME);
+    for(size_t i = 0; i < 4; i++)
+        mlfs_decode_extent(src + 64 + (i * sizeof(mlfs_extent_t)), &dst->extents[i]);
+    dst->first_indirect = mlfs_get_be32(src + 96);
+    memcpy(dst->reserved, src + 100, sizeof(dst->reserved));
+}
+
+static void mlfs_encode_dentry(uint8_t* dst, const mlfs_dentry_t* src)
+{
+    memset(dst, 0, sizeof(mlfs_dentry_t));
+    dst[0]  = src->in_use;
+    dst[1]  = src->flags;
+    dst[14] = src->extents_used;
+    dst[15] = src->extents_total;
+    mlfs_put_be32(dst + 2, src->size_bytes);
+    mlfs_put_be32(dst + 6, src->mtime);
+    mlfs_put_be32(dst + 10, src->ctime);
+    memcpy(dst + 16, src->name, MLFS_MAX_NAME);
+    for(size_t i = 0; i < 4; i++)
+        mlfs_encode_extent(dst + 64 + (i * sizeof(mlfs_extent_t)), &src->extents[i]);
+    mlfs_put_be32(dst + 96, src->first_indirect);
+    memcpy(dst + 100, src->reserved, sizeof(src->reserved));
+}
+
+static void mlfs_decode_dentry_block(void* block, uint32_t bytes_per_block)
+{
+    uint8_t*       raw = (uint8_t*)block;
+    mlfs_dentry_t* de  = (mlfs_dentry_t*)block;
+    uint32_t       per = bytes_per_block / sizeof(mlfs_dentry_t);
+    for(uint32_t i = 0; i < per; i++) {
+        mlfs_dentry_t tmp;
+        mlfs_decode_dentry(raw + (i * sizeof(mlfs_dentry_t)), &tmp);
+        de[i] = tmp;
+    }
+}
+
+static void mlfs_encode_dentry_block(void* block, uint32_t bytes_per_block)
+{
+    uint8_t*       raw = (uint8_t*)block;
+    mlfs_dentry_t* de  = (mlfs_dentry_t*)block;
+    uint32_t       per = bytes_per_block / sizeof(mlfs_dentry_t);
+    for(uint32_t i = 0; i < per; i++) {
+        mlfs_dentry_t tmp = de[i];
+        mlfs_encode_dentry(raw + (i * sizeof(mlfs_dentry_t)), &tmp);
+    }
+}
+
+static void mlfs_decode_mlpt(const uint8_t sec[512], mlpt_t* out)
+{
+    memset(out, 0, sizeof(*out));
+    out->magic = mlfs_get_be32(sec + 0);
+    out->major = sec[4];
+    out->minor = sec[5];
+    out->patch = sec[6];
+    out->count = mlfs_get_be16(sec + 7);
+    for(uint16_t i = 0; i < MLPT_MAX_PARTS; i++) {
+        const uint8_t* src       = sec + 9 + (i * sizeof(mlpt_entry_t));
+        out->entries[i].start_lba       = mlfs_get_be32(src + 0);
+        out->entries[i].block_count     = mlfs_get_be32(src + 4);
+        out->entries[i].type            = src[8];
+        out->entries[i].log2_block_size = src[9];
+        memcpy(out->entries[i].name, src + 10, sizeof(out->entries[i].name));
+    }
+}
+
+static void mlfs_encode_mlpt(uint8_t sec[512], const mlpt_t* pt)
+{
+    memset(sec, 0, 512);
+    mlfs_put_be32(sec + 0, pt->magic);
+    sec[4] = pt->major;
+    sec[5] = pt->minor;
+    sec[6] = pt->patch;
+    mlfs_put_be16(sec + 7, pt->count);
+    for(uint16_t i = 0; i < MLPT_MAX_PARTS; i++) {
+        uint8_t* src = sec + 9 + (i * sizeof(mlpt_entry_t));
+        mlfs_put_be32(src + 0, pt->entries[i].start_lba);
+        mlfs_put_be32(src + 4, pt->entries[i].block_count);
+        src[8] = pt->entries[i].type;
+        src[9] = pt->entries[i].log2_block_size;
+        memcpy(src + 10, pt->entries[i].name, sizeof(pt->entries[i].name));
+    }
+}
+
+static void mlfs_decode_superblock(const uint8_t sec[512], mlfs_superblock_t* sb)
+{
+    memset(sb, 0, sizeof(*sb));
+    sb->magic           = mlfs_get_be32(sec + 0);
+    sb->major           = sec[4];
+    sb->minor           = sec[5];
+    sb->patch           = sec[6];
+    sb->log2_block_size = sec[7];
+    sb->reserved0       = sec[8];
+    sb->total_blocks    = mlfs_get_be32(sec + 9);
+    sb->bitmap_start    = mlfs_get_be32(sec + 13);
+    sb->bitmap_blocks   = mlfs_get_be32(sec + 17);
+    sb->root_dir_block  = mlfs_get_be32(sec + 21);
+    sb->root_dir_blocks = mlfs_get_be32(sec + 25);
+    for(size_t i = 0; i < 4; i++)
+        sb->uuid[i] = mlfs_get_be32(sec + 29 + (i * sizeof(uint32_t)));
+    sb->checksum = mlfs_get_be32(sec + 45);
+    memcpy(sb->reserved, sec + 49, sizeof(sb->reserved));
+}
+
+static void mlfs_encode_superblock(uint8_t sec[512], const mlfs_superblock_t* sb)
+{
+    memset(sec, 0, 512);
+    mlfs_put_be32(sec + 0, sb->magic);
+    sec[4] = sb->major;
+    sec[5] = sb->minor;
+    sec[6] = sb->patch;
+    sec[7] = sb->log2_block_size;
+    sec[8] = sb->reserved0;
+    mlfs_put_be32(sec + 9, sb->total_blocks);
+    mlfs_put_be32(sec + 13, sb->bitmap_start);
+    mlfs_put_be32(sec + 17, sb->bitmap_blocks);
+    mlfs_put_be32(sec + 21, sb->root_dir_block);
+    mlfs_put_be32(sec + 25, sb->root_dir_blocks);
+    for(size_t i = 0; i < 4; i++)
+        mlfs_put_be32(sec + 29 + (i * sizeof(uint32_t)), sb->uuid[i]);
+    mlfs_put_be32(sec + 45, sb->checksum);
+    memcpy(sec + 49, sb->reserved, sizeof(sb->reserved));
+}
+
 // ---- low-level block IO ----
 static int mlfs_read_block(const mlfs_t* fs, uint32_t rel_block, void* buf)
 {
@@ -170,7 +340,7 @@ int mlfs_read_mlpt(const mlfs_io_t* io, mlpt_t* out)
     uint8_t sec[512];
     if(io->read(io->ctx, 0, 1, sec) != 0)
         return -1;
-    memcpy(out, sec, sizeof(mlpt_t));
+    mlfs_decode_mlpt(sec, out);
     if(out->magic != MLPT_MAGIC || out->major != MLPT_VERSION_MAJOR || out->minor != MLPT_VERSION_MINOR || out->patch != MLPT_VERSION_PATCH)
         return -2;
     return 0;
@@ -181,8 +351,7 @@ int mlfs_write_mlpt(const mlfs_io_t* io, const mlpt_t* pt)
     if(!io || !pt)
         return -1;  // Invalid parameters
     uint8_t sec[512];
-    memset(sec, 0, sizeof(sec));
-    memcpy(sec, pt, sizeof(mlpt_t));
+    mlfs_encode_mlpt(sec, pt);
     return io->write(io->ctx, 0, 1, sec);
 }
 
@@ -322,13 +491,15 @@ int mlfs_mkfs(const mlfs_io_t* io, uint16_t part_index, mlfs_t* out_fs)
     uint32_t uuid_temp[4];
     mlfs_fill_uuid(uuid_temp);
     memcpy(sb.uuid, uuid_temp, sizeof(sb.uuid));
-    sb.checksum  = 0;
-    sb.checksum  = mlfs_cksum32(&sb, sizeof(sb));
+    sb.checksum = 0;
+    uint8_t sb_sec[512];
+    mlfs_encode_superblock(sb_sec, &sb);
+    sb.checksum = mlfs_cksum32(sb_sec, sizeof(sb_sec));
     out_fs->sb   = sb;
     uint8_t* blk = (uint8_t*)calloc(1, out_fs->bytes_per_block);
     if(!blk)
         return -6;
-    memcpy(blk, &sb, sizeof(sb));
+    mlfs_encode_superblock(blk, &sb);
     rc = mlfs_write_block(out_fs, 0, blk);
     if(rc) {
         free(blk);
@@ -382,12 +553,12 @@ int mlfs_mount(const mlfs_io_t* io, uint16_t part_index, mlfs_t* out_fs)
     if(rc)
         return rc;
     mlfs_superblock_t sb;
-    memcpy(&sb, tmp, sizeof(sb));
+    mlfs_decode_superblock(tmp, &sb);
     if(sb.magic != MLFS_MAGIC || sb.major != MLFS_VERSION_MAJOR || sb.minor != MLFS_VERSION_MINOR || sb.patch != MLFS_VERSION_PATCH)
         return -10;
     uint32_t old = sb.checksum;
-    sb.checksum  = 0;
-    if(mlfs_cksum32(&sb, sizeof(sb)) != old)
+    tmp[45] = tmp[46] = tmp[47] = tmp[48] = 0;
+    if(mlfs_cksum32(tmp, sizeof(tmp)) != old)
         return -11;
     if(sb.log2_block_size != part.log2_block_size)
         return -12;
@@ -511,7 +682,9 @@ ssize_t mlfs_pwrite_file(mlfs_t* fs, const char* name, const void* src, size_t c
         free(buf);
         return -1;
     }
+    mlfs_decode_dentry_block(buf, fs->bytes_per_block);
     buf[idx] = de;
+    mlfs_encode_dentry_block(buf, fs->bytes_per_block);
     if(mlfs_write_block(fs, blk_addr, buf) != 0) {
         free(buf);
         return -1;
@@ -697,6 +870,7 @@ static int mlfs_dir_lookup_in_dir(const mlfs_t* fs, uint32_t dir_first_block, ui
             free(buf);
             return -1;
         }
+        mlfs_decode_dentry_block(buf, fs->bytes_per_block);
         for(uint32_t i = 0; i < per; i++) {
             if(buf[i].in_use && strncmp(buf[i].name, name, MLFS_MAX_NAME) == 0) {
                 if(out)
@@ -728,6 +902,7 @@ static int mlfs_dir_add_entry_to_dir(const mlfs_t* fs, uint32_t dir_first_block,
             free(buf);
             return -1;
         }
+        mlfs_decode_dentry_block(buf, fs->bytes_per_block);
         for(uint32_t i = 0; i < per; i++) {
             if(!buf[i].in_use) {
                 memset(&buf[i], 0, sizeof(buf[i]));
@@ -739,6 +914,7 @@ static int mlfs_dir_add_entry_to_dir(const mlfs_t* fs, uint32_t dir_first_block,
                 strncpy(buf[i].name, name, MLFS_MAX_NAME - 1);
                 buf[i].name[MLFS_MAX_NAME - 1] = '\0';
                 buf[i].extents[0]              = first_ext;
+                mlfs_encode_dentry_block(buf, fs->bytes_per_block);
                 int rcw                        = mlfs_write_block(fs, dir_first_block + blk, buf);
                 free(buf);
                 return rcw;
@@ -766,11 +942,13 @@ static int mlfs_dir_remove_entry_from_dir(const mlfs_t* fs, uint32_t dir_first_b
         free(buf);
         return -1;
     }
+    mlfs_decode_dentry_block(buf, fs->bytes_per_block);
 
     // Mark entry as not in use
     buf[idx].in_use = 0;
     memset(&buf[idx], 0, sizeof(buf[idx]));  // Clear the entry
 
+    mlfs_encode_dentry_block(buf, fs->bytes_per_block);
     int rcw = mlfs_write_block(fs, blk_addr, buf);
     free(buf);
     return rcw;
@@ -790,6 +968,7 @@ static int mlfs_dir_count_entries_in_dir(const mlfs_t* fs, uint32_t dir_first_bl
             free(buf);
             return -1;
         }
+        mlfs_decode_dentry_block(buf, fs->bytes_per_block);
         for(uint32_t i = 0; i < per; i++) {
             if(buf[i].in_use) {
                 count++;
@@ -992,6 +1171,7 @@ int mlfs_read_directory(mlfs_t* fs, const char* path, mlfs_dentry_t* entries, ui
             free(buf);
             return -1;
         }
+        mlfs_decode_dentry_block(buf, fs->bytes_per_block);
         for(uint32_t i = 0; i < per && found < max_entries; i++) {
             if(buf[i].in_use) {
                 entries[found] = buf[i];

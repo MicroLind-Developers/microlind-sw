@@ -45,7 +45,7 @@ MLFS_DENTRY_CTIME      equ 10
 MLFS_DENTRY_EXTENTS_USED equ 14
 MLFS_DENTRY_NAME       equ 16
 MLFS_DENTRY_EXTENTS    equ 64
-MLFS_DENTRY_FIRST_INDIRECT equ 120
+MLFS_DENTRY_FIRST_INDIRECT equ 96
 MLFS_DENTRY_SIZE       equ 128
 
 ; Constants
@@ -346,4 +346,3 @@ MLFS_BITMAP_GET_DONE:
 ;     jsr MLFS_READ_BLOCK
 ;     leas 6,s                ; Clean up stack
 ;     ; D contains return code
-

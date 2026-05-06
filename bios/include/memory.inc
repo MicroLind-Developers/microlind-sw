@@ -9,10 +9,15 @@ STACK_SIZE                      EQU     1024
 ;Memory map
 BIOS_RAM_START                  EQU $D800
 
+; Configuration Data Memory Map
+; $D800 - $D80F
+CONFIG_DATA_START                EQU BIOS_RAM_START
+CONFIG_DATA_SIZE                 EQU 16
+
 ; Expansion Driver Memory Map
-; $D800 - $D81F
-EXPANSION_DRIVER_RAM_START      EQU BIOS_RAM_START
-EXPANSION_DRIVER_RAM_SIZE       EQU 32
+; $D810 - $D81F
+EXPANSION_DRIVER_RAM_START      EQU BIOS_RAM_START + CONFIG_DATA_SIZE
+EXPANSION_DRIVER_RAM_SIZE       EQU 16
 
 ; Serial Driver Memory Map
 ; $D820 - $D83F

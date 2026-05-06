@@ -67,18 +67,15 @@ enable_testing()
 # Add tests subdirectory
 add_subdirectory(tests)
 
-# Add CLI subdirectory
-add_subdirectory(cli)
-
 # Add tools subdirectory
 add_subdirectory(tools)
 
 # Add convenience target for running all tests
-add_custom_target(check
+add_custom_target(mlfs-check
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --verbose
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running all MLFS tests"
-    DEPENDS mlfs
+    DEPENDS test_basic test_directories test_partitions test_filesystem
 )
 
 # Coverage targets (only available when coverage is enabled)
@@ -118,7 +115,7 @@ if(ENABLE_COVERAGE AND LCOV_PATH AND GENHTML_PATH)
         COMMAND ${LCOV_PATH} --list ${COVERAGE_CLEANED_FILE} || true
         
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        DEPENDS check
+        DEPENDS mlfs-check
         COMMENT "Generating code coverage report"
     )
     

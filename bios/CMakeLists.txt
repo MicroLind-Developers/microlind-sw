@@ -6,9 +6,15 @@ include(${CMAKE_SOURCE_DIR}/../cmake/cmoc.cmake)
 
 set(SRCS_FILES
     "src/init.asm"
+    "src/config.asm"
+    "src/bios_vectors.asm"
+    "src/mlfs.asm"
+    "driver/compactflash.asm"
     "driver/serial_xr88c92.asm"
+    "driver/mmu.asm"
+    "driver/parallel_6522.asm"
+    "driver/irq.asm"
     "driver/bios_c_shim.asm"
-    
 )
 
 # Build the C test project using the macro

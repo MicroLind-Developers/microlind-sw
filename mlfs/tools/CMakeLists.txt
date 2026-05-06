@@ -9,6 +9,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 
 # Add tool subdirectories
+add_subdirectory(cli)
 add_subdirectory(mlfs_info)
 add_subdirectory(mlfs_blockdev)
 

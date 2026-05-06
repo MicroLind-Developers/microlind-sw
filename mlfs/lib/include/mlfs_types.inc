@@ -70,7 +70,7 @@ MLFS_DENTRY_EXTENTS_TOTAL equ 15     ; uint8_t extents_total (1 byte)
 MLFS_DENTRY_NAME        equ 16       ; char name[48] (48 bytes)
 MLFS_DENTRY_EXTENTS     equ 64       ; mlfs_extent_t extents[4] (4 * 8 = 32 bytes)
 MLFS_DENTRY_FIRST_INDIRECT equ 96    ; uint32_t first_indirect (4 bytes)
-MLFS_DENTRY_RESERVED    equ 100       ; uint8_t reserved[4] (4 bytes)
+MLFS_DENTRY_RESERVED    equ 100       ; uint8_t reserved[28] (28 bytes)
 MLFS_DENTRY_SIZE        equ 128
 
 ; Dentry flags
@@ -117,4 +117,3 @@ MLFS_T_SIZE              equ 548
 ; For nested structures:
 ;   ldx fs_ptr
 ;   ldy MLFS_T_IO + MLFS_IO_SECTOR_SIZE,x  ; Load io.sector_size
-

@@ -44,7 +44,7 @@ typedef struct __attribute__((packed)) {
     char          name[MLFS_MAX_NAME];
     mlfs_extent_t extents[4];      // inline; more via extent-index blocks if needed
     uint32_t      first_indirect;  // 0 if none; else block index of extent-index array
-    uint8_t       reserved[4];
+    uint8_t       reserved[28];
 } mlfs_dentry_t;  // 128 bytes exactly
 
 typedef struct __attribute__((packed)) {

@@ -5,7 +5,7 @@
 ; -----------------------------------------------------------------
 
     IFNDEF IO_INC
-        include "../driver/io.inc"
+        include "../include/io.inc"
     ENDC
 
     IFNDEF BIOS_JUMPTAB_BASE
@@ -14,6 +14,7 @@ BIOS_JUMPTAB_BASE  EQU $F800
 
             org BIOS_JUMPTAB_BASE
 
+; Each JMP entry is 3 bytes. Keep BIOS_JUMPTAB_ENTRY_SIZE in bios.h in sync.
 ; Serial
             jmp _serial_init
             jmp _serial_start

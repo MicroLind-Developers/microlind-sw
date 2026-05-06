@@ -238,15 +238,15 @@ static int mlfs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry
     /* Zero the allocated block */
     zero_block = kzalloc(MLFS_SB(sb)->block_size, GFP_KERNEL);
     if (!zero_block) {
-        mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
+        mlfs_free_blocks(sb, be32_to_cpu(extent.start), be32_to_cpu(extent.length));
         return -ENOMEM;
     }
     
-    for (i = 0; i < le32_to_cpu(extent.length); i++) {
-        ret = mlfs_write_fs_block_data(sb, le32_to_cpu(extent.start) + i, zero_block);
+    for (i = 0; i < be32_to_cpu(extent.length); i++) {
+        ret = mlfs_write_fs_block_data(sb, be32_to_cpu(extent.start) + i, zero_block);
         if (ret) {
             kfree(zero_block);
-            mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
+            mlfs_free_blocks(sb, be32_to_cpu(extent.start), be32_to_cpu(extent.length));
             return ret;
         }
     }
@@ -256,7 +256,7 @@ static int mlfs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry
     ret = mlfs_dir_add_entry(sb, dir_mi->first_block, dir_mi->block_count, 
                               name, 0, &extent, 0);
     if (ret) {
-        mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
+        mlfs_free_blocks(sb, be32_to_cpu(extent.start), be32_to_cpu(extent.length));
         return ret;
     }
     
@@ -264,7 +264,7 @@ static int mlfs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry
     inode = new_inode(sb);
     if (!inode) {
         mlfs_dir_remove_entry(sb, dir_mi->first_block, dir_mi->block_count, name);
-        mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
+        mlfs_free_blocks(sb, be32_to_cpu(extent.start), be32_to_cpu(extent.length));
         return -ENOMEM;
     }
     
@@ -275,8 +275,8 @@ static int mlfs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry
     inode->i_size = 0;
     set_nlink(inode, 1);
     
-    MLFS_I(inode)->first_block = le32_to_cpu(extent.start);
-    MLFS_I(inode)->block_count = le32_to_cpu(extent.length);
+    MLFS_I(inode)->first_block = be32_to_cpu(extent.start);
+    MLFS_I(inode)->block_count = be32_to_cpu(extent.length);
     MLFS_I(inode)->parent_dir_block = dir_mi->first_block;
     MLFS_I(inode)->parent_dir_blocks = dir_mi->block_count;
     strncpy(MLFS_I(inode)->filename, name, MLFS_MAX_NAME - 1);
@@ -320,15 +320,15 @@ static int mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry 
     /* Zero the allocated block */
     zero_block = kzalloc(MLFS_SB(sb)->block_size, GFP_KERNEL);
     if (!zero_block) {
-        mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
+        mlfs_free_blocks(sb, be32_to_cpu(extent.start), be32_to_cpu(extent.length));
         return -ENOMEM;
     }
     
-    for (i = 0; i < le32_to_cpu(extent.length); i++) {
-        ret = mlfs_write_fs_block_data(sb, le32_to_cpu(extent.start) + i, zero_block);
+    for (i = 0; i < be32_to_cpu(extent.length); i++) {
+        ret = mlfs_write_fs_block_data(sb, be32_to_cpu(extent.start) + i, zero_block);
         if (ret) {
             kfree(zero_block);
-            mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
+            mlfs_free_blocks(sb, be32_to_cpu(extent.start), be32_to_cpu(extent.length));
             return ret;
         }
     }
@@ -338,7 +338,7 @@ static int mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry 
     ret = mlfs_dir_add_entry(sb, dir_mi->first_block, dir_mi->block_count, 
                               name, 1, &extent, 0);
     if (ret) {
-        mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
+        mlfs_free_blocks(sb, be32_to_cpu(extent.start), be32_to_cpu(extent.length));
         return ret;
     }
     
@@ -346,7 +346,7 @@ static int mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry 
     inode = new_inode(sb);
     if (!inode) {
         mlfs_dir_remove_entry(sb, dir_mi->first_block, dir_mi->block_count, name);
-        mlfs_free_blocks(sb, le32_to_cpu(extent.start), le32_to_cpu(extent.length));
+        mlfs_free_blocks(sb, be32_to_cpu(extent.start), be32_to_cpu(extent.length));
         return -ENOMEM;
     }
     
@@ -357,8 +357,8 @@ static int mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry 
     inode->i_size = MLFS_SB(sb)->block_size;
     set_nlink(inode, 2);
     
-    MLFS_I(inode)->first_block = le32_to_cpu(extent.start);
-    MLFS_I(inode)->block_count = le32_to_cpu(extent.length);
+    MLFS_I(inode)->first_block = be32_to_cpu(extent.start);
+    MLFS_I(inode)->block_count = be32_to_cpu(extent.length);
     
     inode_set_mtime_to_ts(inode, inode_set_ctime_current(inode));
     inode_set_atime_to_ts(inode, inode_get_mtime(inode));
@@ -649,8 +649,8 @@ static int mlfs_alloc_blocks(struct super_block *sb, __u32 blocks_wanted,
     if (ret)
         return ret;
     
-    out_ext->start = cpu_to_le32(start);
-    out_ext->length = cpu_to_le32(blocks_wanted);
+    out_ext->start = cpu_to_be32(start);
+    out_ext->length = cpu_to_be32(blocks_wanted);
     
     /* Update free block count */
     sbi->free_blocks -= blocks_wanted;
@@ -710,8 +710,8 @@ static int mlfs_dir_add_entry(struct super_block *sb, __u32 dir_block,
                 memset(&dentries[i], 0, sizeof(struct mlfs_dentry));
                 dentries[i].in_use = 1;
                 dentries[i].flags = is_dir ? MLFS_FLAG_DIR : MLFS_FLAG_FILE;
-                dentries[i].size_bytes = cpu_to_le32(size_bytes);
-                dentries[i].ctime = dentries[i].mtime = cpu_to_le32(ktime_get_real_seconds());
+                dentries[i].size_bytes = cpu_to_be32(size_bytes);
+                dentries[i].ctime = dentries[i].mtime = cpu_to_be32(ktime_get_real_seconds());
                 dentries[i].extents_used = 1;
                 strncpy(dentries[i].name, name, MLFS_MAX_NAME - 1);
                 dentries[i].name[MLFS_MAX_NAME - 1] = '\0';
@@ -797,8 +797,8 @@ static int mlfs_dir_update_size(struct super_block *sb, __u32 dir_block,
             if (dentries[i].in_use && 
                 strncmp(dentries[i].name, name, MLFS_MAX_NAME) == 0) {
                 /* Found it - update size and mtime */
-                dentries[i].size_bytes = cpu_to_le32(new_size);
-                dentries[i].mtime = cpu_to_le32(ktime_get_real_seconds());
+                dentries[i].size_bytes = cpu_to_be32(new_size);
+                dentries[i].mtime = cpu_to_be32(ktime_get_real_seconds());
                 
                 ret = mlfs_write_fs_block_data(sb, dir_block + blk, block_data);
                 kfree(block_data);
@@ -1069,19 +1069,19 @@ struct inode *mlfs_iget(struct super_block *sb, struct mlfs_dentry *de,
     
     /* Initialize inode */
     mi = MLFS_I(inode);
-    mi->first_block = de->extents[0].start;
-    mi->block_count = de->extents[0].length;
+    mi->first_block = be32_to_cpu(de->extents[0].start);
+    mi->block_count = be32_to_cpu(de->extents[0].length);
     mi->parent_dir_block = parent_dir_block;
     mi->parent_dir_blocks = parent_dir_blocks;
     strncpy(mi->filename, de->name, MLFS_MAX_NAME - 1);
     mi->filename[MLFS_MAX_NAME - 1] = '\0';
     
-    inode->i_size = de->size_bytes;
+    inode->i_size = be32_to_cpu(de->size_bytes);
     inode->i_blocks = mi->block_count;
     
     /* Set timestamps - kernel 6.6+ uses inode_set_* functions */
-    struct timespec64 mtime = { .tv_sec = de->mtime, .tv_nsec = 0 };
-    struct timespec64 ctime = { .tv_sec = de->ctime, .tv_nsec = 0 };
+    struct timespec64 mtime = { .tv_sec = be32_to_cpu(de->mtime), .tv_nsec = 0 };
+    struct timespec64 ctime = { .tv_sec = be32_to_cpu(de->ctime), .tv_nsec = 0 };
     inode_set_mtime_to_ts(inode, mtime);
     inode_set_atime_to_ts(inode, mtime);
     inode_set_ctime_to_ts(inode, ctime);
@@ -1123,8 +1123,8 @@ static int mlfs_read_super(struct super_block *sb, unsigned long partition_lba,
     mlfs_sb = (struct mlfs_superblock *)bh->b_data;
     
     /* Verify magic */
-    if (mlfs_sb->magic != MLFS_MAGIC) {
-        pr_err("mlfs: Invalid superblock magic: 0x%x\n", mlfs_sb->magic);
+    if (be32_to_cpu(mlfs_sb->magic) != MLFS_MAGIC) {
+        pr_err("mlfs: Invalid superblock magic: 0x%x\n", be32_to_cpu(mlfs_sb->magic));
         brelse(bh);
         return -EINVAL;
     }
@@ -1139,11 +1139,11 @@ static int mlfs_read_super(struct super_block *sb, unsigned long partition_lba,
     
     /* Copy superblock info */
     sbi->block_size = 1U << mlfs_sb->log2_block_size;
-    sbi->total_blocks = mlfs_sb->total_blocks;
-    sbi->bitmap_start = mlfs_sb->bitmap_start;
-    sbi->bitmap_blocks = mlfs_sb->bitmap_blocks;
-    sbi->root_dir_block = mlfs_sb->root_dir_block;
-    sbi->root_dir_blocks = mlfs_sb->root_dir_blocks;
+    sbi->total_blocks = be32_to_cpu(mlfs_sb->total_blocks);
+    sbi->bitmap_start = be32_to_cpu(mlfs_sb->bitmap_start);
+    sbi->bitmap_blocks = be32_to_cpu(mlfs_sb->bitmap_blocks);
+    sbi->root_dir_block = be32_to_cpu(mlfs_sb->root_dir_block);
+    sbi->root_dir_blocks = be32_to_cpu(mlfs_sb->root_dir_blocks);
     sbi->partition_lba = partition_lba;
     
     /* Validate critical fields */
@@ -1194,22 +1194,22 @@ static int mlfs_read_partition_table(struct super_block *sb, unsigned int partit
     pt = (struct mlpt *)bh->b_data;
     
     /* Verify magic */
-    if (pt->magic != MLPT_MAGIC) {
-        pr_err("mlfs: Invalid partition table magic: 0x%x\n", pt->magic);
+    if (be32_to_cpu(pt->magic) != MLPT_MAGIC) {
+        pr_err("mlfs: Invalid partition table magic: 0x%x\n", be32_to_cpu(pt->magic));
         brelse(bh);
         return -EINVAL;
     }
     
     /* Check partition exists */
-    if (partition_num >= pt->count) {
+    if (partition_num >= be16_to_cpu(pt->count)) {
         pr_err("mlfs: Partition %u does not exist (count=%u)\n", 
-               partition_num, pt->count);
+               partition_num, be16_to_cpu(pt->count));
         brelse(bh);
         return -EINVAL;
     }
     
     /* Get partition start LBA */
-    *out_lba = pt->entries[partition_num].start_lba;
+    *out_lba = be32_to_cpu(pt->entries[partition_num].start_lba);
     
     MLFS_DEBUG("Partition %u starts at LBA %lu\n", partition_num, *out_lba);
     
@@ -1447,4 +1447,3 @@ static void __exit mlfs_exit(void)
 
 module_init(mlfs_init);
 module_exit(mlfs_exit);
-
