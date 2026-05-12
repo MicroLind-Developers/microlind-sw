@@ -21,19 +21,22 @@
     ENDC
 
 MLOS_SYSCALL_DISPATCH:
-    cmpa #SYS_EXIT
-    beq .exit
-    cmpa #SYS_PUTC
-    beq .putc
-    cmpa #SYS_WRITE
-    beq .write
-    cmpa #SYS_READ
-    beq .read
-    cmpa #SYS_SBRK
-    beq .sbrk
-    cmpa #SYS_TICKS
-    beq .ticks
-    bra .enosys
+    ; cmpa #SYS_EXIT
+    ; beq .exit
+    ; cmpa #SYS_PUTC
+    ; beq .putc
+    ; cmpa #SYS_WRITE
+    ; beq .write
+    ; cmpa #SYS_READ
+    ; beq .read
+    ; cmpa #SYS_SBRK
+    ; beq .sbrk
+    ; cmpa #SYS_TICKS
+    ; beq .ticks
+    ; bra .enosys
+
+    lda #BIOS_JUMPTAB_BASE_UPPER
+    andb #
 
 .exit:
     jmp MLOS_HALT
