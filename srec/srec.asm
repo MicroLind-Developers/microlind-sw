@@ -5,40 +5,44 @@ COUNT_H =
 
 
 PARSE:  lda ,x+
-        beq _PRS0
-        cmpa #$52
-        bne PARSE
+        beq _PRS0       #null
+        cmpa #$53       # 'S'
+        bne PARSE       # repeat until 'S' is found
         lda ,x+
-        clrb
-        suba #$30
-        lbmi ERR
-        cmpa #$0a
-        lbpl ERR
-        ldb #no_start_err
-        cmpa #$00
+        clrb            # symbol error
+        suba #$30       # recenter on '0'
+        lbmi ERR        # error on lower ascii value than '0'
+        cmpa #$0a       # check if character value is higher than '9'
+        lbpl ERR        # error on value higher than '9'
+        ldb #no_start_err       # no start record error
+        cmpa #$00       # check if first record is a start record
         lbne ERR
-        jsr S0_PARSE
-        clrb
+        jsr S0_PARSE    # parse start record
+_entry: clrb            # symbol error
         lda ,x+
-        cmpa #$53
-        lbne ERR
+        cmpa #$53       # 'S'
+        lbne ERR        # error on no record hedder
         lda ,x+
-        suba #$30
-        beq _PRS1
-        lbmi ERR
-        cmpa #$0a
-        lbpl ERR
-        cmpa #$01
-        bne _PRS2
-        jsr 
+        suba #$30       # recenter on '0'
+        beq _PRS1       # error on second start record
+        lbmi ERR        # error on lower ascii value than '0'
+        cmpa #$0a       # check if character value is higher than '9'
+        lbpl ERR        # error on value higher than '9'
+        cmpa #$01       # check if '1'
+        bne _PRS2       # if not hop to next check
+        jsr             # parse data record
         jmp 
-_PRS3:  cmpa #$09
-        jsr 
+_PRS2:  cmpa #$05       # check if '5'
+        bne _PRS3       # if not hop to next check
+        jsr             # parse count record
         jmp 
-_PRS2:  cmpa #$05
-        jsr 
+_PRS3:  cmpa #$09       # check if '9'
+        bne _PRS4       # if not hop to next check
+        jsr             # parse 16-bit terminator
         jmp 
-
+_PRS4:                  
+        ldb #incorect_record_err        # parse rest of records or error
+        jmp ERR         # incorect record error, no other record types suported
 _PRS0:  ldb #no_records_err
         jmp ERR
 _PRS1:  ldb #second_start_err
@@ -119,28 +123,28 @@ S5_PARSE:
         rts
 
 S0_PARSE:
-        lda ,x+
+        lda ,x+         #load count
         ldb ,x+
         jsr ASCII_BYTE
         clrb
-        lbcs ERR
-        tfr a,e         #count
+        lbcs ERR        # symbol error
+        tfr a,e         # transfer count to e
         clra
-        clrf            #checksum
-_S0_0:  addr a,f
-        lda ,x+
+        clrf            # clear f to hold checksum
+_S0_0:  addr a,f        # add byte to checksum
+        lda ,x+         # load byte
         ldb ,x+
         jsr ASCII_BYTE
         clrb
-        bcs ERR
-        dece
-        bne _S0_0       # loop
+        bcs ERR         #symbol error
+        dece            # decrement count
+        bne _S0_0       # loop if not last byte
         comf            # checksum calculasion
         cmpr a,f
-        bne _SX_1
-        jsr _PARSE_TERMINATOR
-        ldb #length_err
-        lbcs ERR
+        bne _SX_1       # if checksum is not equal, checksum error
+        jsr _PARSE_TERMINATOR   # parse the terminator
+        ldb #length_err # terminator not parsed corectly?
+        lbcs ERR        # length error
         rts
 _SX_1:  ldb #checksum_err
         lbra ERR
@@ -204,7 +208,7 @@ _ASC1:   anda #$0f
 _ASC0:   orcc #$01
         rts
 
-symbal_err  = $00
+symbol_err  = $00
 no_start_err = $01
 length_err = $02
 checksum_err = $03
@@ -223,7 +227,7 @@ err_table:
         fdb icrRecErr
         fdb misDatErr
 
-symErr:     FCC "Unexpected symbal error"
+symErr:     FCC "Unexpected symbol error"
                 fcb $0d,$00
 noStrErr:   fcc "Mising start record error"
                 fcb $0d,$00
