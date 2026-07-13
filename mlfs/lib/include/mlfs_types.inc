@@ -7,12 +7,12 @@
 ; Constants
 ; -----------------------------------------------------------------
 MLPT_MAGIC             equ $4D4C5054  ; 'MLPT'
-MLPT_VERSION_MAJOR      equ 0
+MLPT_VERSION_MAJOR      equ 1
 MLPT_VERSION_MINOR      equ 1
 MLPT_VERSION_PATCH      equ 0
 
 MLFS_MAGIC              equ $4D4C4653  ; 'MLFS'
-MLFS_VERSION_MAJOR       equ 0
+MLFS_VERSION_MAJOR       equ 1
 MLFS_VERSION_MINOR       equ 1
 MLFS_VERSION_PATCH      equ 0
 

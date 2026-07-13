@@ -28,56 +28,62 @@ _serial_start:
     export _serial_print
 _serial_print:
     pshs u
-    tfr  s,u
+    leau ,s
     ldx  2,u
     jsr  SERIAL_PRINT_A
+    leas ,u
     puls u,pc
 
 ; void serial_putc(uint8_t ch)
     export _serial_putc
 _serial_putc:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  SERIAL_PRINT_CHAR_A
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void serial_input(char* buf, uint16_t size)
     export _serial_input
 _serial_input:
     pshs u
-    tfr  s,u
+    leau ,s
     ldx  2,u      ; buf
     ldy  4,u      ; size
     jsr  SERIAL_INPUT_A
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void serial_print_byte(uint8_t v)
     export _serial_print_byte
 _serial_print_byte:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  SERIAL_PRINT_BYTE_A
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void serial_print_byte_hex(uint8_t v)
     export _serial_print_byte_hex
 _serial_print_byte_hex:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  SERIAL_PRINT_BYTE_HEX_A
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void serial_print_word_hex(uint16_t v)
     export _serial_print_word_hex
 _serial_print_word_hex:
     pshs u
-    tfr  s,u
+    leau ,s
     ldx  2,u
     jsr  SERIAL_PRINT_WORD_HEX_A
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void serial_print_crlf(void)
     export _serial_print_crlf
@@ -89,19 +95,21 @@ _serial_print_crlf:
     export _serial_set_ct
 _serial_set_ct:
     pshs u
-    tfr  s,u
+    leau ,s
     ldd  2,u
     jsr  SERIAL_SET_CT
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void serial_set_ct_mode(uint8_t mode)
     export _serial_set_ct_mode
 _serial_set_ct_mode:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  SERIAL_SET_CT_MODE
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void serial_enable_ct_irq(void)
     export _serial_enable_ct_irq
@@ -125,10 +133,11 @@ _serial_stop_ct:
     export _set_led
 _set_led:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  SET_LED
-    puls u,pc
+    leas ,u
+	puls u,pc
 
     export _set_led_red
 _set_led_red:
@@ -161,66 +170,73 @@ _mmu_init:
     ldx  #.ret_from_mmu_init
     jsr  MMU_INIT
 .ret_from_mmu_init:
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void mmu_set_register(uint8_t reg, uint8_t val)
     export _mmu_set_register
 _mmu_set_register:
     pshs u
-    tfr  s,u
+    leau ,s
     clra
     ldb  2,u      ; reg index (8-bit)
     tfr  d,x      ; X = 0:reg
     lda  3,u      ; value
     jsr  MMU_SET_REGISTER
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void mmu_set_register_0(uint8_t val)
     export _mmu_set_register_0
 _mmu_set_register_0:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  MMU_SET_REGISTER_0
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void mmu_set_register_1(uint8_t val)
     export _mmu_set_register_1
 _mmu_set_register_1:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  MMU_SET_REGISTER_1
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void mmu_set_register_2(uint8_t val)
     export _mmu_set_register_2
 _mmu_set_register_2:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  MMU_SET_REGISTER_2
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; void mmu_set_register_3(uint8_t val)
     export _mmu_set_register_3
 _mmu_set_register_3:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  MMU_SET_REGISTER_3
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; uint8_t mmu_get_register(uint8_t reg)
     export _mmu_get_register
 _mmu_get_register:
     pshs u
-    tfr  s,u
+    leau ,s
     clra
     ldb  2,u      ; reg index (8-bit)
     tfr  d,x
     jsr  MMU_GET_REGISTER
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; uint8_t mmu_get_register_0(void)
     export _mmu_get_register_0
@@ -306,10 +322,11 @@ _irq_init:
     export _irq_set_filter
 _irq_set_filter:
     pshs u
-    tfr  s,u
+    leau ,s
     lda  2,u
     jsr  IRQ_SET_FILTER
-    puls u,pc
+    leas ,u
+	puls u,pc
 
 ; uint8_t irq_get_active(void)
     export _irq_get_active

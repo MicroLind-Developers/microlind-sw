@@ -32,8 +32,8 @@ lib/
 ### `src/mlfs.c`
 - **Main implementation** of all MLFS functions
 - Filesystem operations (mkfs, mount)
-- File operations (create, read, write, delete)
-- Directory operations (create, list, delete)
+- File operations (create, read, write, rename, delete)
+- Directory operations (create, list, rename, delete)
 - Block allocation and bitmap management
 
 ## Usage
@@ -75,6 +75,7 @@ target_link_libraries(your_target PRIVATE mlfs)
 | `mlfs_create_empty_file()` | Create new file |
 | `mlfs_pwrite_file()` | Write to file |
 | `mlfs_pread_file()` | Read from file |
+| `mlfs_rename()` | Rename or move file |
 | `mlfs_delete_file()` | Delete file |
 
 ### Directory Operations
@@ -83,6 +84,7 @@ target_link_libraries(your_target PRIVATE mlfs)
 |----------|---------|
 | `mlfs_create_directory()` | Create directory |
 | `mlfs_read_directory()` | List directory contents |
+| `mlfs_rename()` | Rename or move directory |
 | `mlfs_delete_directory()` | Delete empty directory |
 
 ### Memory Management
@@ -90,6 +92,7 @@ target_link_libraries(your_target PRIVATE mlfs)
 | Function | Purpose |
 |----------|---------|
 | `mlfs_alloc_run()` | Allocate block range |
+| `mlfs_get_block_stats()` | Count used and free blocks from the allocation bitmap |
 
 ## Build Options
 

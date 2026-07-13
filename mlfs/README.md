@@ -7,6 +7,7 @@ A lightweight, embedded file system designed for microcontroller and embedded sy
 - **Multi-partition support** with custom partition table format (MLPT)
 - **Flexible block sizes** (512 bytes to 64KB, configurable per partition)
 - **Directory support** with full subdirectory navigation
+- **Rename support** for files and directories
 - **Extent-based storage** for efficient file allocation
 - **Comprehensive test suite** with automated coverage analysis
 - **CLI tools** for filesystem management and inspection
@@ -58,7 +59,7 @@ firefox build/coverage/html/index.html
 - **`lib/`** - Core MLFS library implementation
 - **`cli/`** - Command-line interface for filesystem management
 - **`tools/`** - Utilities (mlfs_info for analysis, mlfs_blockdev for block devices)
-- **`kmod/`** - Linux kernel module for native mounting (read-only)
+- **`kmod/`** - Linux kernel module for native read/write mounting
 - **`tests/`** - Comprehensive test suite using Check framework
 
 ## Architecture

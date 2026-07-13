@@ -16,6 +16,8 @@ HOOK_IRQ:
     ; jmp IRQ_HANDLER
 
 HOOK_SWI3:
+    ; jmp SYS_CALL_HANDLER
+    
 HOOK_SWI2:
 HOOK_SWI:
     ; jmp PM_HANDLER

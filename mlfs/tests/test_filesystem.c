@@ -62,9 +62,9 @@ START_TEST(test_mkfs_basic)
     
     // Verify superblock was created correctly
     ck_assert_int_eq(fs.sb.magic, 0x4D4C4653u); // 'MLFS'
-    ck_assert_int_eq(fs.sb.major, 0);
-    ck_assert_int_eq(fs.sb.minor, 1);
-    ck_assert_int_eq(fs.sb.patch, 0);
+    ck_assert_int_eq(fs.sb.major, MLFS_VERSION_MAJOR);
+    ck_assert_int_eq(fs.sb.minor, MLFS_VERSION_MINOR);
+    ck_assert_int_eq(fs.sb.patch, MLFS_VERSION_PATCH);
     ck_assert_int_eq(fs.sb.log2_block_size, log2_block_size);
     
     // Check that basic filesystem structures were allocated
@@ -73,6 +73,12 @@ START_TEST(test_mkfs_basic)
     ck_assert_int_gt(fs.sb.bitmap_blocks, 0);
     ck_assert_int_gt(fs.sb.root_dir_block, fs.sb.bitmap_start);
     ck_assert_int_eq(fs.sb.root_dir_blocks, 2);
+
+    uint32_t used_blocks = 0;
+    uint32_t free_blocks = 0;
+    ck_assert_mlfs_ok(mlfs_get_block_stats(&fs, &used_blocks, &free_blocks));
+    ck_assert_int_eq(used_blocks, 1 + fs.sb.bitmap_blocks + fs.sb.root_dir_blocks);
+    ck_assert_int_eq(free_blocks, fs.sb.total_blocks - used_blocks);
 }
 END_TEST
 

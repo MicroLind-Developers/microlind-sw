@@ -11,8 +11,8 @@ BIOS_RAM_START                  EQU $D800
 
 ; Configuration Data Memory Map
 ; $D800 - $D80F
-CONFIG_DATA_START                EQU BIOS_RAM_START
-CONFIG_DATA_SIZE                 EQU 16
+CONFIG_DATA_START               EQU BIOS_RAM_START
+CONFIG_DATA_SIZE                EQU 16
 
 ; Expansion Driver Memory Map
 ; $D810 - $D81F

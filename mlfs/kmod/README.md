@@ -13,8 +13,8 @@ A Linux kernel module that integrates MLFS (MicroLind File System) with the Linu
 
 ### Core Functionality ✅
 - ✅ **Mount/Unmount** - Standard Linux mount command integration
-- ✅ **File Operations** - Read, write, create, delete files
-- ✅ **Directory Operations** - Create, delete, list directories  
+- ✅ **File Operations** - Read, write, create, rename, delete files
+- ✅ **Directory Operations** - Create, rename, delete, list directories  
 - ✅ **Multi-Partition Support** - Mount multiple MLFS partitions simultaneously
 - ✅ **Proper VFS Integration** - Full Linux VFS compatibility
 - ✅ **Block Allocation** - Dynamic block allocation with bitmap management
@@ -132,6 +132,71 @@ echo "mlfs" | sudo tee -a /etc/modules
 sudo modprobe mlfs
 ```
 
+### Secure Boot Systems
+
+On systems with Secure Boot enabled, Linux may reject locally built modules with:
+
+```
+insmod: ERROR: could not insert module mlfs.ko: Key was rejected by service
+```
+
+That means the module built correctly, but the kernel does not trust its signature. You can either disable Secure Boot in your firmware settings, or keep Secure Boot enabled and sign the module with a locally enrolled Machine Owner Key (MOK).
+
+#### Sign with a local MOK
+
+Install the signing tools:
+
+```bash
+sudo apt-get install mokutil openssl
+```
+
+Create a local signing key. Keep `MOK.priv` private; it can sign kernel modules trusted by your machine after enrollment.
+
+```bash
+cd mlfs/kmod
+openssl req -new -x509 -newkey rsa:2048 \
+  -keyout MOK.priv \
+  -outform DER \
+  -out MOK.der \
+  -nodes \
+  -days 36500 \
+  -subj "/CN=MLFS local module signing/"
+```
+
+Enroll the public key with shim/MOK:
+
+```bash
+sudo mokutil --import MOK.der
+```
+
+Choose a temporary enrollment password when prompted, then reboot. During boot, the MOK manager screen will appear. Select **Enroll MOK**, confirm the key, enter the temporary password, and continue booting.
+
+After enrollment, sign the module every time you rebuild it:
+
+```bash
+make
+/lib/modules/$(uname -r)/build/scripts/sign-file sha512 MOK.priv MOK.der mlfs.ko
+sudo insmod mlfs.ko debug=1
+```
+
+For permanent installation, sign first, then install and load via `modprobe`:
+
+```bash
+make
+/lib/modules/$(uname -r)/build/scripts/sign-file sha512 MOK.priv MOK.der mlfs.ko
+sudo make install
+sudo depmod -a
+sudo modprobe mlfs
+```
+
+Verify the module signature and load state:
+
+```bash
+modinfo mlfs.ko | grep -E 'signer|sig_key|sig_hashalgo'
+lsmod | grep mlfs
+sudo dmesg | grep -i mlfs
+```
+
 ## Usage
 
 ### Basic Mounting
@@ -189,6 +254,10 @@ rm /mnt/mlfs/test.txt
 
 # Delete directories
 rmdir /mnt/mlfs/mydir
+
+# Rename files and directories
+mv /mnt/mlfs/old.txt /mnt/mlfs/new.txt
+mv /mnt/mlfs/olddir /mnt/mlfs/newdir
 
 # Write data
 dd if=/dev/urandom of=/mnt/mlfs/random.dat bs=1K count=100
@@ -356,7 +425,7 @@ sudo mount -t mlfs /dev/sdb /mnt/mlfs
 # Mount partition 1
 sudo mount -t mlfs -o partition=1 /dev/sdb /mnt/mlfs1
 
-# Mount partition 2 read-only (already enforced, but explicit)
+# Mount partition 2 read-only
 sudo mount -t mlfs -o partition=2,ro /dev/sdc /mnt/mlfs2
 ```
 
@@ -474,6 +543,22 @@ sudo dmesg | grep mlfs
 # Verify kernel headers match
 uname -r
 ls /lib/modules/$(uname -r)/build
+```
+
+#### "Key was rejected by service"
+
+This is normally a Secure Boot module-signing failure, not an MLFS build failure. Check whether Secure Boot is enabled:
+
+```bash
+mokutil --sb-state
+```
+
+If Secure Boot is enabled, either disable Secure Boot in firmware or follow the **Secure Boot Systems** signing steps above. The short version after the MOK has been enrolled is:
+
+```bash
+make
+/lib/modules/$(uname -r)/build/scripts/sign-file sha512 MOK.priv MOK.der mlfs.ko
+sudo insmod mlfs.ko debug=1
 ```
 
 ## Architecture
@@ -730,27 +815,26 @@ sudo rmmod mlfs
 
 ## Development
 
-### Adding Write Support
+### Extending Write Support
 
-Key areas to implement:
+The module already supports read/write mounting, file writes, create/delete,
+mkdir/rmdir, and rename. Key areas for future write-support improvements:
 
-1. **Remove read-only flag** in `mlfs_fill_super`:
+1. **Page cache integration**:
    ```c
-   // sb->s_flags |= SB_RDONLY;  /* Remove this line */
+   .read_iter = generic_file_read_iter,
+   .write_iter = generic_file_write_iter,
    ```
 
-2. **Implement write operations** in `mlfs_file_operations`:
+2. **Additional inode operations**:
    ```c
-   .write = mlfs_write,
-   .write_iter = mlfs_write_iter,
+   .setattr = mlfs_setattr,
+   .getattr = mlfs_getattr,
    ```
 
-3. **Implement create operations** in `mlfs_dir_inode_operations`:
+3. **Additional rename modes**:
    ```c
-   .create = mlfs_create,
-   .unlink = mlfs_unlink,
-   .mkdir = mlfs_mkdir,
-   .rmdir = mlfs_rmdir,
+   /* Optional future support for RENAME_EXCHANGE and overwrite rename */
    ```
 
 4. **Implement bitmap allocation**:
@@ -776,8 +860,10 @@ Key areas to implement:
 | **Read files** | ✅ Full | Read any file, any size, any offset |
 | **Write files** | ✅ Full | Write to existing files or create new ones |
 | **Create files** | ✅ Full | Create new files with initial block allocation |
+| **Rename files** | ✅ Full | Rename or move files when the target does not already exist |
 | **Delete files** | ✅ Full | Delete files and reclaim blocks |
 | **Create directories** | ✅ Full | Create new directories |
+| **Rename directories** | ✅ Full | Rename or move directories when the target does not already exist |
 | **Delete directories** | ✅ Full | Delete empty directories |
 | **List directories** | ✅ Full | List directory contents (ls, find, etc.) |
 | **Stat files** | ✅ Full | Get file metadata (size, times, mode) |
@@ -826,7 +912,8 @@ mlfs/kmod/
 │   │   ├── create
 │   │   ├── mkdir
 │   │   ├── unlink
-│   │   └── rmdir
+│   │   ├── rmdir
+│   │   └── rename
 │   ├── File operations
 │   │   ├── read
 │   │   ├── write
@@ -948,4 +1035,3 @@ When contributing to the kernel module:
 - `mlfs_proc.c` - Proc filesystem support
 - `mlfs_proc.h` - Statistics API
 - `Makefile` - Build configuration
-
