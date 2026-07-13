@@ -11,14 +11,14 @@
 // -----------------------------
 
 #define MLPT_MAGIC 0x4D4C5054u /* 'MLPT' */
-#define MLPT_VERSION_MAJOR 0
+#define MLPT_VERSION_MAJOR 1
 #define MLPT_VERSION_MINOR 1
 #define MLPT_VERSION_PATCH 0
 #define MLPT_VERSION ((MLPT_VERSION_MAJOR << 16) | (MLPT_VERSION_MINOR << 8) | MLPT_VERSION_PATCH)
 #define MLPT_MAX_PARTS 16
 
 #define MLFS_MAGIC 0x4D4C4653u /* 'MLFS' */
-#define MLFS_VERSION_MAJOR 0
+#define MLFS_VERSION_MAJOR 1
 #define MLFS_VERSION_MINOR 1
 #define MLFS_VERSION_PATCH 0
 #define MLFS_VERSION ((MLFS_VERSION_MAJOR << 16) | (MLFS_VERSION_MINOR << 8) | MLFS_VERSION_PATCH)
@@ -54,6 +54,7 @@ int mlfs_mount(const mlfs_io_t* io, uint16_t part_index, mlfs_t* out_fs);
 
 // Simple allocator & file ops (root only; single-extent files)
 int     mlfs_alloc_run(mlfs_t* fs, uint32_t blocks_wanted, mlfs_extent_t* out_ext);
+int     mlfs_get_block_stats(mlfs_t* fs, uint32_t* used_blocks, uint32_t* free_blocks);
 int     mlfs_create_empty_file(mlfs_t* fs, const char* name, uint32_t initial_blocks);
 ssize_t mlfs_pwrite_file(mlfs_t* fs, const char* name, const void* src, size_t count, size_t offset);
 ssize_t mlfs_pread_file(mlfs_t* fs, const char* name, void* dst, size_t count, size_t offset);
@@ -62,6 +63,7 @@ ssize_t mlfs_pread_file(mlfs_t* fs, const char* name, void* dst, size_t count, s
 int mlfs_create_directory(mlfs_t* fs, const char* path, uint32_t initial_blocks);
 int mlfs_delete_directory(mlfs_t* fs, const char* path);
 int mlfs_delete_file(mlfs_t* fs, const char* path);
+int mlfs_rename(mlfs_t* fs, const char* old_path, const char* new_path);
 int mlfs_read_directory(mlfs_t* fs, const char* path, mlfs_dentry_t* entries, uint32_t max_entries, uint32_t* count_out);
 
 #endif  // MLFS_H

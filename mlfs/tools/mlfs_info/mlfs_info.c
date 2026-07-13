@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <time.h>
 
@@ -36,6 +37,64 @@ int info_file_write(void *ctx, uint64_t lba, uint32_t count, const void *buf)
 {
     (void)ctx; (void)lba; (void)count; (void)buf;
     return -1; // Read-only
+}
+
+static uint16_t get_be16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
+}
+
+static uint32_t get_be32(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) |
+           ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] << 8) |
+           (uint32_t)p[3];
+}
+
+static void decode_mlpt_sector(const uint8_t sector[512], mlpt_t *pt)
+{
+    memset(pt, 0, sizeof(*pt));
+    pt->magic = get_be32(sector + 0);
+    pt->major = sector[4];
+    pt->minor = sector[5];
+    pt->patch = sector[6];
+    pt->count = get_be16(sector + 7);
+
+    for(uint16_t i = 0; i < MLPT_MAX_PARTS; ++i) {
+        const uint8_t *entry = sector + 9 + (i * sizeof(mlpt_entry_t));
+        pt->entries[i].start_lba = get_be32(entry + 0);
+        pt->entries[i].block_count = get_be32(entry + 4);
+        pt->entries[i].type = entry[8];
+        pt->entries[i].log2_block_size = entry[9];
+        memcpy(pt->entries[i].name, entry + 10, sizeof(pt->entries[i].name));
+    }
+}
+
+static int read_mlpt_for_diagnostics(FILE *file, mlpt_t *pt)
+{
+    uint8_t sector[512];
+    long current_pos = ftell(file);
+    if(info_file_read(file, 0, 1, sector) != 0) {
+        if(current_pos >= 0) {
+            fseek(file, current_pos, SEEK_SET);
+        }
+        return -1;
+    }
+    if(current_pos >= 0) {
+        fseek(file, current_pos, SEEK_SET);
+    }
+
+    decode_mlpt_sector(sector, pt);
+    if(pt->magic != MLPT_MAGIC) {
+        return -2;
+    }
+    if(pt->major != MLPT_VERSION_MAJOR ||
+       pt->minor != MLPT_VERSION_MINOR ||
+       pt->patch != MLPT_VERSION_PATCH) {
+        return -3;
+    }
+    return 0;
 }
 
 // Format timestamp for display
@@ -145,26 +204,14 @@ void display_directory_tree(mlfs_t *fs, const char *path, int depth, const char 
     }
 }
 
-// Calculate estimated bitmap statistics (simplified - no access to internal bitmap reading)
-void analyze_bitmap(mlfs_t *fs, uint32_t *used_blocks, uint32_t *free_blocks)
+// Read actual bitmap statistics through the public MLFS API
+int analyze_bitmap(mlfs_t *fs, uint32_t *used_blocks, uint32_t *free_blocks)
 {
-    // Since we can't access mlfs_read_block (internal API), we'll estimate based on filesystem structure
-    // This is a simplified analysis that shows the theoretical capacity
-    
-    // Calculate minimum used blocks (system blocks + root directory)
-    uint32_t system_blocks = 1 + fs->sb.bitmap_blocks + fs->sb.root_dir_blocks; // superblock + bitmap + root dir
-    
-    // For a more accurate estimate, we could count directory entries, but for now use a conservative estimate
-    // In a real implementation, this would require access to the bitmap or directory traversal with size counting
-    *used_blocks = system_blocks; // Minimum used blocks (conservative estimate)
-    *free_blocks = (fs->sb.total_blocks > system_blocks) ? (fs->sb.total_blocks - system_blocks) : 0;
-    
-    // Note: This is a simplified analysis. For accurate block usage, 
-    // the bitmap would need to be read using internal MLFS functions.
+    return mlfs_get_block_stats(fs, used_blocks, free_blocks);
 }
 
 // Display general information and partition table
-void display_general_info(FILE *file)
+int display_general_info(FILE *file, mlpt_t *pt_out)
 {
     printf("MLFS Filesystem Information\n");
     printf("===========================\n\n");
@@ -189,21 +236,37 @@ void display_general_info(FILE *file)
     
     // Partition Table Information
     mlpt_t pt;
-    mlfs_io_t io = {
-        .ctx = file,
-        .read = info_file_read,
-        .write = info_file_write,
-        .sector_size = 512
-    };
-    
-    if(mlfs_read_mlpt(&io, &pt) == 0) {
+    int pt_status = read_mlpt_for_diagnostics(file, &pt);
+    if(pt_out) {
+        *pt_out = pt;
+    }
+
+    if(pt_status == -1) {
+        printf("Partition Table:\n");
+        printf("  Error:           Could not read sector 0\n\n");
+        return pt_status;
+    }
+
+    if(pt.magic == MLPT_MAGIC) {
         printf("Partition Table:\n");
         printf("  Magic:           0x%08X\n", pt.magic);
         printf("  Version:         %u.%u.%u\n", pt.major, pt.minor, pt.patch);
+        if(pt_status == -3) {
+            printf("  Warning:         Unsupported MLPT version for this build; expected %u.%u.%u\n",
+                   MLPT_VERSION_MAJOR,
+                   MLPT_VERSION_MINOR,
+                   MLPT_VERSION_PATCH);
+        }
         printf("  Partitions:      %u\n", pt.count);
         
         // Display all partitions
-        for(uint16_t i = 0; i < pt.count; i++) {
+        uint16_t display_count = pt.count > MLPT_MAX_PARTS ? MLPT_MAX_PARTS : pt.count;
+        if(pt.count > MLPT_MAX_PARTS) {
+            printf("  Warning:         Partition count exceeds MLPT_MAX_PARTS (%u); showing first %u\n",
+                   MLPT_MAX_PARTS,
+                   display_count);
+        }
+        for(uint16_t i = 0; i < display_count; i++) {
             printf("  Partition %u:\n", i);
             printf("    Type:          %u", pt.entries[i].type);
             if(pt.entries[i].type == 1) {
@@ -214,21 +277,33 @@ void display_general_info(FILE *file)
             printf("    Block Count:   %u blocks", pt.entries[i].block_count);
             
             char size_str[16];
-            format_size((uint64_t)pt.entries[i].block_count * (1U << pt.entries[i].log2_block_size), size_str, sizeof(size_str));
+            uint64_t block_size = pt.entries[i].log2_block_size < 32 ? (1ULL << pt.entries[i].log2_block_size) : 0;
+            format_size((uint64_t)pt.entries[i].block_count * block_size, size_str, sizeof(size_str));
             printf(" (%s)\n", size_str);
-            printf("    Block Size:    %u bytes (log2: %u)\n", 1U << pt.entries[i].log2_block_size, pt.entries[i].log2_block_size);
+            if(block_size > 0) {
+                printf("    Block Size:    %" PRIu64 " bytes (log2: %u)\n", block_size, pt.entries[i].log2_block_size);
+            } else {
+                printf("    Block Size:    invalid (log2: %u)\n", pt.entries[i].log2_block_size);
+            }
             printf("    Name:          %.14s\n", pt.entries[i].name);
             
             // Calculate end LBA
-            uint32_t sectors_per_block = (1U << pt.entries[i].log2_block_size) / 512;
-            uint32_t end_lba = pt.entries[i].start_lba + (pt.entries[i].block_count * sectors_per_block) - 1;
-            printf("    End LBA:       %u\n", end_lba);
-            printf("    Sectors Used:  %u\n", pt.entries[i].block_count * sectors_per_block);
+            uint64_t sectors_per_block = block_size / 512;
+            uint64_t sectors_used = (uint64_t)pt.entries[i].block_count * sectors_per_block;
+            uint64_t end_lba = (sectors_used == 0) ? pt.entries[i].start_lba : (uint64_t)pt.entries[i].start_lba + sectors_used - 1;
+            printf("    End LBA:       %" PRIu64 "\n", end_lba);
+            printf("    Sectors Used:  %" PRIu64 "\n", sectors_used);
             
-            if(i < pt.count - 1) printf("\n");
+            if(i < display_count - 1) printf("\n");
         }
         printf("\n");
+    } else {
+        printf("Partition Table:\n");
+        printf("  Magic:           0x%08X\n", pt.magic);
+        printf("  Error:           Sector 0 does not contain an MLPT header\n\n");
     }
+
+    return pt_status;
 }
 
 // Main function
@@ -290,7 +365,8 @@ int main(int argc, char **argv)
     };
     
     // Always display general and partition table information
-    display_general_info(file);
+    mlpt_t pt;
+    int pt_status = display_general_info(file, &pt);
     
     // Only analyze specific partition if requested
     if(!analyze_partition) {
@@ -303,6 +379,20 @@ int main(int argc, char **argv)
     mlfs_t fs;
     int result = mlfs_mount(&io, partition_number, &fs);
     if(result != 0) {
+        fflush(stdout);
+        if(pt_status == -3) {
+            fprintf(stderr,
+                    "Error: The image has MLPT version %u.%u.%u, but this tool expects %u.%u.%u.\n",
+                    pt.major,
+                    pt.minor,
+                    pt.patch,
+                    MLPT_VERSION_MAJOR,
+                    MLPT_VERSION_MINOR,
+                    MLPT_VERSION_PATCH);
+            fprintf(stderr, "The partition table was decoded for display, but this build will not mount incompatible MLPT versions.\n");
+        } else if(pt_status != 0) {
+            fprintf(stderr, "Error: Could not read a compatible MLPT partition table (error %d).\n", pt_status);
+        }
         fprintf(stderr, "Error: Failed to mount MLFS partition %u (error %d)\n", partition_number, result);
         fprintf(stderr, "This partition may not contain a valid MLFS filesystem or may be corrupted.\n");
         fprintf(stderr, "Note: Partition table information above may still be valid.\n");
@@ -346,32 +436,49 @@ int main(int argc, char **argv)
     }
     printf("\n\n");
     
-    // Block allocation statistics (estimated)
-    printf("Block Allocation (Estimated):\n");
+    // Block allocation statistics
+    printf("Block Allocation:\n");
     uint32_t used_blocks, free_blocks;
-    analyze_bitmap(&fs, &used_blocks, &free_blocks);
+    int stats_result = analyze_bitmap(&fs, &used_blocks, &free_blocks);
+    if(stats_result != 0) {
+        printf("  Error:           Could not read allocation bitmap (error %d)\n", stats_result);
+        printf("\n");
+        fclose(file);
+        return 1;
+    }
     
     char used_size_str[16], free_size_str[16];
     format_size((uint64_t)used_blocks * (1U << fs.sb.log2_block_size), used_size_str, sizeof(used_size_str));
     format_size((uint64_t)free_blocks * (1U << fs.sb.log2_block_size), free_size_str, sizeof(free_size_str));
     
-    printf("  Min Used Blocks: %u (%s) [system blocks only]\n", used_blocks, used_size_str);
-    printf("  Max Free Blocks: %u (%s)\n", free_blocks, free_size_str);
+    printf("  Used Blocks:     %u (%s)\n", used_blocks, used_size_str);
+    printf("  Free Blocks:     %u (%s)\n", free_blocks, free_size_str);
     printf("  Total Capacity:  %u blocks", fs.sb.total_blocks);
     
     char total_capacity_str[16];
     format_size((uint64_t)fs.sb.total_blocks * (1U << fs.sb.log2_block_size), total_capacity_str, sizeof(total_capacity_str));
     printf(" (%s)\n", total_capacity_str);
     
-    printf("  Note: Actual usage may be higher (bitmap not accessible via public API)\n");
     printf("\n");
     
-    // Display directory tree
-    printf("Directory Structure:\n");
-    printf("===================\n");
-    display_directory_tree(&fs, "/", 0, "", 1);
+    // Display directory tree only when the root directory has entries.
+    mlfs_dentry_t root_probe[1];
+    uint32_t root_count = 0;
+    int root_result = mlfs_read_directory(&fs, "/", root_probe, 1, &root_count);
+    bool displayed_directory = false;
+    if(root_result != 0) {
+        printf("Directory Structure:\n");
+        printf("===================\n");
+        display_directory_tree(&fs, "/", 0, "", 1);
+        displayed_directory = true;
+    } else if(root_count > 0) {
+        printf("Directory Structure:\n");
+        printf("===================\n");
+        display_directory_tree(&fs, "/", 0, "", 1);
+        displayed_directory = true;
+    }
     
-    printf("\nAnalysis complete.\n");
+    printf("%sAnalysis complete.\n", displayed_directory ? "\n" : "");
     
     fclose(file);
     return 0;

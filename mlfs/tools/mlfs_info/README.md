@@ -39,7 +39,7 @@ General Information:
 
 Partition Table:
   Magic:           0x4D4C5054
-  Version:         0.1.0
+  Version:         1.1.0
   Partitions:      2
   Partition 0:
     Type:          1 (MLFS)
@@ -72,7 +72,7 @@ Partition 0 Filesystem Details:
 
 Superblock:
   Magic:           0x4D4C4653
-  Version:         0.1.0
+  Version:         1.1.0
   Block Size:      4096 bytes (log2: 12)
   Total Blocks:    8192 (32.0 MB)
   Bitmap Start:    block 1
@@ -80,11 +80,10 @@ Superblock:
   Root Directory:  block 2, 1 blocks (4.0 KB)
   UUID:            a1b2c3d4-e5f6-7890-1234-567890abcdef
 
-Block Allocation (Estimated):
-  Min Used Blocks: 3 (12.0 KB) [system blocks only]
-  Max Free Blocks: 8189 (32.7 MB)
+Block Allocation:
+  Used Blocks:     3 (12.0 KB)
+  Free Blocks:     8189 (32.0 MB)
   Total Capacity:  8192 blocks (32.0 MB)
-  Note: Actual usage may be higher (bitmap not accessible via public API)
 
 Directory Structure:
 ===================
@@ -137,6 +136,11 @@ The tool uses the MLFS library in read-only mode to:
 
 The analysis is completely safe and read-only - it never modifies the source image file.
 
+If an image contains an MLPT header with an unsupported version, `mlfs_info`
+still displays the decoded partition table and prints the version expected by
+the current build. Detailed filesystem analysis is disabled in that case because
+`mlfs/lib` will not mount incompatible MLPT versions.
+
 ## Multi-Partition Support
 
 The tool supports MLFS images with multiple partitions:
@@ -185,4 +189,3 @@ make install
 - [MLFS CLI Tool](../cli/README.md) - Interactive filesystem management
 - [MLFS Library Documentation](../lib/README.md) - Core library API
 - [Project README](../README.md) - Overall project information
-

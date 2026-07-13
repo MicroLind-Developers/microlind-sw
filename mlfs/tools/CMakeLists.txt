@@ -12,6 +12,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 add_subdirectory(cli)
 add_subdirectory(mlfs_info)
 add_subdirectory(mlfs_blockdev)
+add_subdirectory(mlfs_commander)
 
 # Register clean target with global property (following project pattern)
 set_property(GLOBAL APPEND PROPERTY MICROLIND_CLEAN_TARGETS tools-clean)

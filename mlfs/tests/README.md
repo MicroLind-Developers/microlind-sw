@@ -6,7 +6,7 @@ This directory contains the test suite for the MLFS (MicroLind File System) libr
 
 - **`test_common.h`** - Common test utilities, Check framework helpers, and setup/teardown functions
 - **`test_basic.c`** - Basic filesystem operations (mkfs, mount, file I/O) using Check test cases
-- **`test_directories.c`** - Directory operations (create, read, delete directories and files) using Check test cases
+- **`test_directories.c`** - Directory operations (create, read, rename, delete directories and files) using Check test cases
 - **`test_partitions.c`** - Partition table management (create, add, validate partitions) using Check test cases
 - **`test_filesystem.c`** - Core filesystem operations (mkfs, mount with validation and error handling) using Check test cases
 

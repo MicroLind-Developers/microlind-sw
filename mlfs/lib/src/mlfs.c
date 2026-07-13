@@ -19,10 +19,13 @@
 // ---- Forward declarations for static functions ----
 static int mlfs_split_path(const char* path, char components[][MLFS_MAX_NAME], int max_components);
 static int mlfs_resolve_path(mlfs_t* fs, const char* path, uint32_t* target_dir_block, uint32_t* target_dir_blocks, char* filename);
+static int mlfs_path_is_descendant(const char* parent_path, const char* child_path);
 static int mlfs_dir_lookup_in_dir(const mlfs_t* fs, uint32_t dir_first_block, uint32_t dir_num_blocks, const char* name, mlfs_dentry_t* out,
                                   uint32_t* out_block, uint32_t* out_index);
 static int mlfs_dir_add_entry_to_dir(const mlfs_t* fs, uint32_t dir_first_block, uint32_t dir_num_blocks, const char* name, int is_dir,
                                      mlfs_extent_t first_ext, uint32_t size_bytes);
+static int mlfs_dir_add_existing_entry_to_dir(const mlfs_t* fs, uint32_t dir_first_block, uint32_t dir_num_blocks, const mlfs_dentry_t* entry);
+static int mlfs_dir_write_entry_at(const mlfs_t* fs, uint32_t block_addr, uint32_t index, const mlfs_dentry_t* entry);
 static int mlfs_dir_remove_entry_from_dir(const mlfs_t* fs, uint32_t dir_first_block, uint32_t dir_num_blocks, const char* name);
 static int mlfs_dir_count_entries_in_dir(const mlfs_t* fs, uint32_t dir_first_block, uint32_t dir_num_blocks, uint32_t* count_out);
 
@@ -313,6 +316,31 @@ static int mlfs_bitmap_mark_run(const mlfs_t* fs, uint32_t start, uint32_t len, 
         if(rc)
             return rc;
     }
+    return 0;
+}
+
+int mlfs_get_block_stats(mlfs_t* fs, uint32_t* used_blocks, uint32_t* free_blocks)
+{
+    if(!fs || !used_blocks || !free_blocks)
+        return -1;
+    if(fs->bytes_per_block == 0 || fs->sb.total_blocks == 0)
+        return -2;
+
+    uint32_t used = 0;
+    uint32_t free_count = 0;
+    for(uint32_t block = 0; block < fs->sb.total_blocks; ++block) {
+        int is_used = 0;
+        int rc = mlfs_bitmap_get(fs, block, &is_used);
+        if(rc != 0)
+            return rc;
+        if(is_used)
+            ++used;
+        else
+            ++free_count;
+    }
+
+    *used_blocks = used;
+    *free_blocks = free_count;
     return 0;
 }
 
@@ -856,6 +884,24 @@ static int mlfs_resolve_path(mlfs_t* fs, const char* path, uint32_t* target_dir_
     return 0;
 }
 
+static int mlfs_path_is_descendant(const char* parent_path, const char* child_path)
+{
+    char parent_components[16][MLFS_MAX_NAME];
+    char child_components[16][MLFS_MAX_NAME];
+    int  parent_count = mlfs_split_path(parent_path, parent_components, 16);
+    int  child_count  = mlfs_split_path(child_path, child_components, 16);
+
+    if(parent_count <= 0 || child_count <= parent_count)
+        return 0;
+
+    for(int i = 0; i < parent_count; i++) {
+        if(strcmp(parent_components[i], child_components[i]) != 0)
+            return 0;
+    }
+
+    return 1;
+}
+
 // Helper: generalized directory lookup (works on any directory)
 static int mlfs_dir_lookup_in_dir(const mlfs_t* fs, uint32_t dir_first_block, uint32_t dir_num_blocks, const char* name, mlfs_dentry_t* out,
                                   uint32_t* out_block, uint32_t* out_index)
@@ -923,6 +969,58 @@ static int mlfs_dir_add_entry_to_dir(const mlfs_t* fs, uint32_t dir_first_block,
     }
     free(buf);
     return 1;  // no free slots
+}
+
+static int mlfs_dir_add_existing_entry_to_dir(const mlfs_t* fs, uint32_t dir_first_block, uint32_t dir_num_blocks, const mlfs_dentry_t* entry)
+{
+    const uint32_t per = fs->bytes_per_block / sizeof(mlfs_dentry_t);
+    mlfs_dentry_t* buf = (mlfs_dentry_t*)malloc(fs->bytes_per_block);
+    if(!buf)
+        return -1;
+
+    for(uint32_t blk = 0; blk < dir_num_blocks; ++blk) {
+        if(mlfs_read_block(fs, dir_first_block + blk, buf) != 0) {
+            free(buf);
+            return -1;
+        }
+        mlfs_decode_dentry_block(buf, fs->bytes_per_block);
+        for(uint32_t i = 0; i < per; i++) {
+            if(!buf[i].in_use) {
+                buf[i] = *entry;
+                mlfs_encode_dentry_block(buf, fs->bytes_per_block);
+                int rcw = mlfs_write_block(fs, dir_first_block + blk, buf);
+                free(buf);
+                return rcw;
+            }
+        }
+    }
+
+    free(buf);
+    return 1;
+}
+
+static int mlfs_dir_write_entry_at(const mlfs_t* fs, uint32_t block_addr, uint32_t index, const mlfs_dentry_t* entry)
+{
+    const uint32_t per = fs->bytes_per_block / sizeof(mlfs_dentry_t);
+    if(index >= per)
+        return -1;
+
+    mlfs_dentry_t* buf = (mlfs_dentry_t*)malloc(fs->bytes_per_block);
+    if(!buf)
+        return -1;
+
+    if(mlfs_read_block(fs, block_addr, buf) != 0) {
+        free(buf);
+        return -1;
+    }
+
+    mlfs_decode_dentry_block(buf, fs->bytes_per_block);
+    buf[index] = *entry;
+    mlfs_encode_dentry_block(buf, fs->bytes_per_block);
+
+    int rcw = mlfs_write_block(fs, block_addr, buf);
+    free(buf);
+    return rcw;
 }
 
 // Helper: remove directory entry
@@ -1111,6 +1209,66 @@ int mlfs_delete_file(mlfs_t* fs, const char* path)
 
     // Remove file entry from parent directory
     return mlfs_dir_remove_entry_from_dir(fs, target_dir_block, target_dir_blocks, filename);
+}
+
+int mlfs_rename(mlfs_t* fs, const char* old_path, const char* new_path)
+{
+    if(!fs || !old_path || !new_path)
+        return -1;
+
+    uint32_t old_dir_block, old_dir_blocks;
+    char     old_name[MLFS_MAX_NAME];
+    int      rc = mlfs_resolve_path(fs, old_path, &old_dir_block, &old_dir_blocks, old_name);
+    if(rc != 0)
+        return rc;
+    if(strlen(old_name) == 0)
+        return -5;
+
+    uint32_t old_entry_block = 0, old_entry_index = 0;
+    mlfs_dentry_t old_entry;
+    rc = mlfs_dir_lookup_in_dir(fs, old_dir_block, old_dir_blocks, old_name, &old_entry, &old_entry_block, &old_entry_index);
+    if(rc)
+        return rc;
+
+    uint32_t new_dir_block, new_dir_blocks;
+    char     new_name[MLFS_MAX_NAME];
+    rc = mlfs_resolve_path(fs, new_path, &new_dir_block, &new_dir_blocks, new_name);
+    if(rc != 0)
+        return rc;
+    if(strlen(new_name) == 0)
+        return -5;
+
+    if((old_entry.flags & 1) && mlfs_path_is_descendant(old_path, new_path))
+        return -6;
+
+    if(old_dir_block == new_dir_block && old_dir_blocks == new_dir_blocks && strcmp(old_name, new_name) == 0)
+        return 0;
+
+    mlfs_dentry_t existing;
+    rc = mlfs_dir_lookup_in_dir(fs, new_dir_block, new_dir_blocks, new_name, &existing, NULL, NULL);
+    if(rc == 0)
+        return -7;
+    if(rc < 0)
+        return rc;
+
+    mlfs_dentry_t renamed = old_entry;
+    size_t new_name_len = strlen(new_name);
+    memset(renamed.name, 0, sizeof(renamed.name));
+    memcpy(renamed.name, new_name, new_name_len + 1);
+    renamed.mtime = mlfs_now_unix();
+
+    if(old_dir_block == new_dir_block && old_dir_blocks == new_dir_blocks)
+        return mlfs_dir_write_entry_at(fs, old_entry_block, old_entry_index, &renamed);
+
+    rc = mlfs_dir_add_existing_entry_to_dir(fs, new_dir_block, new_dir_blocks, &renamed);
+    if(rc)
+        return rc;
+
+    rc = mlfs_dir_remove_entry_from_dir(fs, old_dir_block, old_dir_blocks, old_name);
+    if(rc)
+        mlfs_dir_remove_entry_from_dir(fs, new_dir_block, new_dir_blocks, new_name);
+
+    return rc;
 }
 
 // Read directory contents

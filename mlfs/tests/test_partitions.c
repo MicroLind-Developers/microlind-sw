@@ -47,9 +47,9 @@ START_TEST(test_make_empty_partition_table)
     
     // Check partition table structure
     ck_assert_int_eq(pt.magic, 0x4D4C5054u); // 'MLPT'
-    ck_assert_int_eq(pt.major, 0);
-    ck_assert_int_eq(pt.minor, 1);
-    ck_assert_int_eq(pt.patch, 0);
+    ck_assert_int_eq(pt.major, MLPT_VERSION_MAJOR);
+    ck_assert_int_eq(pt.minor, MLPT_VERSION_MINOR);
+    ck_assert_int_eq(pt.patch, MLPT_VERSION_PATCH);
     ck_assert_int_eq(pt.count, 0); // No partitions initially
 }
 END_TEST

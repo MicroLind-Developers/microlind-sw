@@ -121,6 +121,43 @@ START_TEST(test_directory_deletion)
 }
 END_TEST
 
+START_TEST(test_file_rename)
+{
+    const char *content = "rename keeps file data";
+    char buffer[64] = {0};
+
+    ck_assert_mlfs_ok(mlfs_create_empty_file(&g_test_mnt, "old.txt", 1));
+    ck_assert_int_eq(mlfs_pwrite_file(&g_test_mnt, "old.txt", content, strlen(content), 0), (ssize_t)strlen(content));
+
+    ck_assert_mlfs_ok(mlfs_rename(&g_test_mnt, "old.txt", "new.txt"));
+    ck_assert_mlfs_fail(mlfs_pread_file(&g_test_mnt, "old.txt", buffer, sizeof(buffer) - 1, 0));
+    ck_assert_int_eq(mlfs_pread_file(&g_test_mnt, "new.txt", buffer, sizeof(buffer) - 1, 0), (ssize_t)strlen(content));
+    ck_assert_str_eq(buffer, content);
+}
+END_TEST
+
+START_TEST(test_directory_rename_and_move)
+{
+    const char *content = "nested file survives directory move";
+    char buffer[64] = {0};
+
+    ck_assert_mlfs_ok(mlfs_create_directory(&g_test_mnt, "docs", 1));
+    ck_assert_mlfs_ok(mlfs_create_empty_file(&g_test_mnt, "docs/readme.txt", 1));
+    ck_assert_int_eq(mlfs_pwrite_file(&g_test_mnt, "docs/readme.txt", content, strlen(content), 0), (ssize_t)strlen(content));
+
+    ck_assert_mlfs_ok(mlfs_rename(&g_test_mnt, "docs", "manuals"));
+    ck_assert_mlfs_fail(mlfs_read_directory(&g_test_mnt, "docs", (mlfs_dentry_t[4]){}, 4, &(uint32_t){0}));
+    ck_assert_int_eq(mlfs_pread_file(&g_test_mnt, "manuals/readme.txt", buffer, sizeof(buffer) - 1, 0), (ssize_t)strlen(content));
+    ck_assert_str_eq(buffer, content);
+
+    ck_assert_mlfs_ok(mlfs_create_directory(&g_test_mnt, "archive", 1));
+    ck_assert_mlfs_ok(mlfs_rename(&g_test_mnt, "manuals/readme.txt", "archive/readme.txt"));
+    memset(buffer, 0, sizeof(buffer));
+    ck_assert_int_eq(mlfs_pread_file(&g_test_mnt, "archive/readme.txt", buffer, sizeof(buffer) - 1, 0), (ssize_t)strlen(content));
+    ck_assert_str_eq(buffer, content);
+}
+END_TEST
+
 START_TEST(test_error_conditions)
 {
     // Test operations on non-existent entries
@@ -249,6 +286,7 @@ Suite *directory_suite(void)
     Suite *s;
     TCase *tc_creation;
     TCase *tc_deletion;
+    TCase *tc_rename;
     TCase *tc_errors;
     TCase *tc_advanced;
 
@@ -269,6 +307,13 @@ Suite *directory_suite(void)
     tcase_add_test(tc_deletion, test_file_deletion);
     tcase_add_test(tc_deletion, test_directory_deletion);
     suite_add_tcase(s, tc_deletion);
+
+    // Rename tests
+    tc_rename = tcase_create("Rename");
+    tcase_add_checked_fixture(tc_rename, setup_mlfs_test, teardown_mlfs_test);
+    tcase_add_test(tc_rename, test_file_rename);
+    tcase_add_test(tc_rename, test_directory_rename_and_move);
+    suite_add_tcase(s, tc_rename);
 
     // Error condition tests
     tc_errors = tcase_create("Errors");

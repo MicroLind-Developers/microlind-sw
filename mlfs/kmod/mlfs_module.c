@@ -18,6 +18,7 @@
 #include <linux/parser.h>
 #include <linux/statfs.h>
 #include <linux/seq_file.h>
+#include <linux/version.h>
 
 #include "mlfs_module.h"
 #include "mlfs_proc.h"
@@ -152,6 +153,13 @@ static int mlfs_alloc_blocks(struct super_block *sb, __u32 blocks_wanted, struct
 static int mlfs_free_blocks(struct super_block *sb, __u32 start, __u32 length);
 static int mlfs_dir_add_entry(struct super_block *sb, __u32 dir_block, __u32 dir_blocks, 
                                 const char *name, int is_dir, struct mlfs_extent *extent, __u32 size_bytes);
+static int mlfs_dir_find_entry(struct super_block *sb, __u32 dir_block, __u32 dir_blocks,
+                                const char *name, struct mlfs_dentry *out,
+                                __u32 *out_block, __u32 *out_index);
+static int mlfs_dir_add_existing_entry(struct super_block *sb, __u32 dir_block,
+                                        __u32 dir_blocks, const struct mlfs_dentry *entry);
+static int mlfs_dir_write_entry_at(struct super_block *sb, __u32 block, __u32 index,
+                                    const struct mlfs_dentry *entry);
 static int mlfs_dir_remove_entry(struct super_block *sb, __u32 dir_block, __u32 dir_blocks, const char *name);
 
 /* Forward declarations for operations structures */
@@ -297,7 +305,7 @@ static int mlfs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry
 /*
  * Create a new directory
  */
-static int mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
+static int mlfs_mkdir_impl(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
     struct super_block *sb = dir->i_sb;
     struct mlfs_inode_info *dir_mi = MLFS_I(dir);
@@ -374,6 +382,22 @@ static int mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry 
     return 0;  /* Success */
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+static struct dentry *mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir,
+                                 struct dentry *dentry, umode_t mode)
+{
+    int ret = mlfs_mkdir_impl(idmap, dir, dentry, mode);
+
+    return ret ? ERR_PTR(ret) : NULL;
+}
+#else
+static int mlfs_mkdir(struct mnt_idmap *idmap, struct inode *dir,
+                      struct dentry *dentry, umode_t mode)
+{
+    return mlfs_mkdir_impl(idmap, dir, dentry, mode);
+}
+#endif
+
 /*
  * Delete a file
  */
@@ -430,12 +454,100 @@ static int mlfs_rmdir(struct inode *dir, struct dentry *dentry)
     return mlfs_unlink(dir, dentry);
 }
 
+static int mlfs_rename(struct mnt_idmap *idmap, struct inode *old_dir,
+                       struct dentry *old_dentry, struct inode *new_dir,
+                       struct dentry *new_dentry, unsigned int flags)
+{
+    struct super_block *sb = old_dir->i_sb;
+    struct inode *old_inode = d_inode(old_dentry);
+    struct mlfs_inode_info *old_dir_mi = MLFS_I(old_dir);
+    struct mlfs_inode_info *new_dir_mi = MLFS_I(new_dir);
+    struct mlfs_dentry entry;
+    __u32 entry_block = 0, entry_index = 0;
+    const char *old_name = old_dentry->d_name.name;
+    const char *new_name = new_dentry->d_name.name;
+    int ret;
+
+    if (flags & ~RENAME_NOREPLACE)
+        return -EINVAL;
+    if (!old_inode)
+        return -ENOENT;
+    if (old_dentry->d_name.len >= MLFS_MAX_NAME ||
+        new_dentry->d_name.len >= MLFS_MAX_NAME)
+        return -ENAMETOOLONG;
+    if (d_really_is_positive(new_dentry))
+        return -EEXIST;
+
+    MLFS_DEBUG("rename: %s -> %s\n", old_name, new_name);
+
+    if (old_dir == new_dir && strcmp(old_name, new_name) == 0)
+        return 0;
+
+    ret = mlfs_dir_find_entry(sb, old_dir_mi->first_block,
+                              old_dir_mi->block_count, old_name,
+                              &entry, &entry_block, &entry_index);
+    if (ret)
+        return ret;
+
+    ret = mlfs_dir_find_entry(sb, new_dir_mi->first_block,
+                              new_dir_mi->block_count, new_name,
+                              NULL, NULL, NULL);
+    if (ret == 0)
+        return -EEXIST;
+    if (ret != -ENOENT)
+        return ret;
+
+    memset(entry.name, 0, sizeof(entry.name));
+    strncpy(entry.name, new_name, MLFS_MAX_NAME - 1);
+    entry.name[MLFS_MAX_NAME - 1] = '\0';
+    entry.mtime = cpu_to_be32(ktime_get_real_seconds());
+
+    if (old_dir == new_dir) {
+        ret = mlfs_dir_write_entry_at(sb, entry_block, entry_index, &entry);
+    } else {
+        ret = mlfs_dir_add_existing_entry(sb, new_dir_mi->first_block,
+                                          new_dir_mi->block_count, &entry);
+        if (ret)
+            return ret;
+
+        ret = mlfs_dir_remove_entry(sb, old_dir_mi->first_block,
+                                    old_dir_mi->block_count, old_name);
+        if (ret) {
+            mlfs_dir_remove_entry(sb, new_dir_mi->first_block,
+                                  new_dir_mi->block_count, new_name);
+            return ret;
+        }
+
+        if (S_ISDIR(old_inode->i_mode)) {
+            drop_nlink(old_dir);
+            inc_nlink(new_dir);
+        }
+
+        MLFS_I(old_inode)->parent_dir_block = new_dir_mi->first_block;
+        MLFS_I(old_inode)->parent_dir_blocks = new_dir_mi->block_count;
+    }
+
+    if (ret)
+        return ret;
+
+    strncpy(MLFS_I(old_inode)->filename, new_name, MLFS_MAX_NAME - 1);
+    MLFS_I(old_inode)->filename[MLFS_MAX_NAME - 1] = '\0';
+
+    inode_set_mtime_to_ts(old_inode, inode_set_ctime_current(old_inode));
+    mark_inode_dirty(old_inode);
+    mark_inode_dirty(old_dir);
+    mark_inode_dirty(new_dir);
+
+    return 0;
+}
+
 static const struct inode_operations mlfs_dir_inode_operations = {
     .lookup     = mlfs_lookup,
     .create     = mlfs_create,
     .mkdir      = mlfs_mkdir,
     .unlink     = mlfs_unlink,
     .rmdir      = mlfs_rmdir,
+    .rename     = mlfs_rename,
 };
 
 /*
@@ -729,6 +841,102 @@ static int mlfs_dir_add_entry(struct super_block *sb, __u32 dir_block,
     }
     
     return ret;  /* No free slots */
+}
+
+/* Find an entry in a directory */
+static int mlfs_dir_find_entry(struct super_block *sb, __u32 dir_block,
+                                __u32 dir_blocks, const char *name,
+                                struct mlfs_dentry *out,
+                                __u32 *out_block, __u32 *out_index)
+{
+    struct mlfs_sb_info *sbi = MLFS_SB(sb);
+    __u32 entries_per_block = sbi->dentries_per_block;
+    struct mlfs_dentry *dentries;
+    char *block_data;
+    __u32 blk, i;
+
+    for (blk = 0; blk < dir_blocks; blk++) {
+        block_data = mlfs_read_fs_block_data(sb, dir_block + blk);
+        if (!block_data)
+            return -EIO;
+
+        dentries = (struct mlfs_dentry *)block_data;
+
+        for (i = 0; i < entries_per_block; i++) {
+            if (dentries[i].in_use &&
+                strncmp(dentries[i].name, name, MLFS_MAX_NAME) == 0) {
+                if (out)
+                    *out = dentries[i];
+                if (out_block)
+                    *out_block = dir_block + blk;
+                if (out_index)
+                    *out_index = i;
+                kfree(block_data);
+                return 0;
+            }
+        }
+
+        kfree(block_data);
+    }
+
+    return -ENOENT;
+}
+
+/* Add an already-populated dentry to a directory */
+static int mlfs_dir_add_existing_entry(struct super_block *sb, __u32 dir_block,
+                                        __u32 dir_blocks, const struct mlfs_dentry *entry)
+{
+    struct mlfs_sb_info *sbi = MLFS_SB(sb);
+    __u32 entries_per_block = sbi->dentries_per_block;
+    struct mlfs_dentry *dentries;
+    char *block_data;
+    __u32 blk, i;
+    int ret = -ENOSPC;
+
+    for (blk = 0; blk < dir_blocks; blk++) {
+        block_data = mlfs_read_fs_block_data(sb, dir_block + blk);
+        if (!block_data)
+            return -EIO;
+
+        dentries = (struct mlfs_dentry *)block_data;
+
+        for (i = 0; i < entries_per_block; i++) {
+            if (!dentries[i].in_use) {
+                dentries[i] = *entry;
+                ret = mlfs_write_fs_block_data(sb, dir_block + blk, block_data);
+                kfree(block_data);
+                return ret;
+            }
+        }
+
+        kfree(block_data);
+    }
+
+    return ret;
+}
+
+/* Replace a dentry at a known block and index */
+static int mlfs_dir_write_entry_at(struct super_block *sb, __u32 block, __u32 index,
+                                    const struct mlfs_dentry *entry)
+{
+    struct mlfs_sb_info *sbi = MLFS_SB(sb);
+    struct mlfs_dentry *dentries;
+    char *block_data;
+    int ret;
+
+    if (index >= sbi->dentries_per_block)
+        return -EINVAL;
+
+    block_data = mlfs_read_fs_block_data(sb, block);
+    if (!block_data)
+        return -EIO;
+
+    dentries = (struct mlfs_dentry *)block_data;
+    dentries[index] = *entry;
+
+    ret = mlfs_write_fs_block_data(sb, block, block_data);
+    kfree(block_data);
+    return ret;
 }
 
 /* Remove an entry from a directory */
