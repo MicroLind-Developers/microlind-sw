@@ -4,7 +4,7 @@
 ; Copyright Eric & Linus Lind 2024
 ;
     INCLUDE "../include/memory.inc"
-    org $FF00
+    org $FE00
 
 HOOK_TRAP:
     jmp HANG    
@@ -69,7 +69,7 @@ INIT:
 	; jsr PARALLEL_INIT
 
     ; Initialize the led to Blue
-    jsr SET_LED_BLUE
+    jsr SET_LED_GREEN
 
     ; Print the initialization message
     ; This is a message that will be printed to the serial port
@@ -82,7 +82,8 @@ INIT:
     ldx #msg_mem_detect
     jsr SERIAL_PRINT_A
     lda CONFIG_RAM_CHIP_COUNT
-    jsr SERIAL_PRINT_DECIMAL_A  
+    adda #'0'
+    jsr SERIAL_PRINT_CHAR_A
     ldx #msg_line_break
     jsr SERIAL_PRINT_A
     
@@ -91,13 +92,15 @@ INIT:
     ; if carry clear, CF_OK in A, card is ready for use
     jsr CF_INIT
     ; if carry not clear jump to _NO_CF to skip
-    ldx #$01
-    stx CONFIG_CF_PRESENT_FLAG
+    bcs _NO_CF
+    lda #$01
+    sta CONFIG_CF_PRESENT_FLAG
     ldx #msg_cf_present
     jsr SERIAL_PRINT_A
     jmp _END_CF
 
 _NO_CF:
+    clr CONFIG_CF_PRESENT_FLAG
     ldx #msg_no_cf
     jsr SERIAL_PRINT_A
 _END_CF:
@@ -135,12 +138,12 @@ CLEAR_REGS:
 ;     rts
 
 msg_init:
-    fcc "Initializing µLind..."
+    fcc "Initializing microLind..."
     fcb 10,13,0
 
 msg_mem_detect:
     fcc "Detected RAM chips: "
-
+    fcb 0
 msg_cf_present:
     fcc " * CompactFlash card detected and initialized."
     fcb 10,13,0

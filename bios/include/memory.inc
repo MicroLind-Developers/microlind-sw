@@ -1,6 +1,7 @@
 ; MicroLind BIOS and System Memory Map,
 ; Memory area: $C000 - $DFFF (8kB in Bank 4)
 
+    IFNDEF MEMORY_INC
 MEMORY_INC EQU 1
 
 STACK_START                     EQU     $DFFF
@@ -65,3 +66,4 @@ AUDIO_DRIVER_RAM_START          EQU VIDEO_DRIVER_RAM_START+VIDEO_DRIVER_RAM_SIZE
 AUDIO_DRIVER_RAM_SIZE           EQU 32
 AUDIO_BUFFER_START 	            EQU $C800
 AUDIO_BUFFER_SIZE 	            EQU 1024
+    ENDC

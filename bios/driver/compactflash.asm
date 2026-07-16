@@ -63,6 +63,14 @@ CF_ERR_DEVICE           EQU     $02
 ; -----------------------------------------------------------------
 
 CF_INIT:
+        lda     CF_STATUS
+        cmpa    #$FF
+        bne     _CF_INIT_DEVICE_PRESENT
+        lda     #CF_ERR_TIMEOUT
+        orcc    #$01
+        rts
+
+_CF_INIT_DEVICE_PRESENT:
         lda     #CF_LBA_MASTER
         sta     CF_DRIVE_HEAD
         jsr     CF_WAIT_READY

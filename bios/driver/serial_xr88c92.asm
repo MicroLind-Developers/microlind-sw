@@ -10,11 +10,10 @@
         include "../include/memory.inc"
     ENDC
 
-LED_ALL             EQU $07 ; Red, Green, Blue
-LED_RED             EQU $04 ; Red
-LED_GREEN           EQU $02 ; Green
-LED_BLUE            EQU $01 ; Blue
-LED_OFF             EQU $00 ; Off
+LED_ALL             EQU $70 ; Red, Green, Blue
+LED_RED             EQU $10 ; Red
+LED_GREEN           EQU $20 ; Green
+LED_BLUE            EQU $40 ; Blue
 
 SERIAL_TIMER_IRQ_JUMP_VECTOR    EQU SERIAL_DRIVER_RAM_START      ; 2 byte address for jump vector when timer irq is triggered
 SERIAL_RXA_IRQ_JUMP_VECTOR      EQU SERIAL_TIMER_IRQ_JUMP_VECTOR+2  ; 2 byte address for jump vector when RXA irq is triggered
@@ -445,7 +444,7 @@ SET_LED:
     beq _DONE
 
     ; Else set the LED
-    sta SERIAL_OPCR
+    sta SERIAL_SOPR
 
 _DONE:
     rts
@@ -459,7 +458,7 @@ _DONE:
 SET_LED_RED:
     jsr SET_LED_OFF
     lda #LED_RED
-    sta SERIAL_OPCR
+    sta SERIAL_SOPR
     rts
 
 ; -----------------------------------------------------------------
@@ -471,7 +470,7 @@ SET_LED_RED:
 SET_LED_GREEN:
     jsr SET_LED_OFF
     lda #LED_GREEN
-    sta SERIAL_OPCR
+    sta SERIAL_SOPR
     rts
 
 ; -----------------------------------------------------------------
@@ -483,7 +482,7 @@ SET_LED_GREEN:
 SET_LED_BLUE:
     jsr SET_LED_OFF
     lda #LED_BLUE
-    sta SERIAL_OPCR
+    sta SERIAL_SOPR
     rts
 
 ; -----------------------------------------------------------------
@@ -493,8 +492,8 @@ SET_LED_BLUE:
 ; clobbers:         A
 ; -----------------------------------------------------------------
 SET_LED_OFF:
-    lda #LED_OFF
-    sta SERIAL_OPCR
+    lda #LED_ALL
+    sta SERIAL_ROPR
     rts
 
 ; -----------------------------------------------------------------
