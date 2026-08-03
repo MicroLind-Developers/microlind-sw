@@ -13,47 +13,112 @@
 BUFFER equ SERIAL_BUFFER_START
 BUFFER_SIZE equ $0F
 RAM_TEST_START equ $0000
-RAM_TEST_END equ $1000
+RAM_TEST_END equ $4000
+RAM_TEST_FIRST_BANK equ $00
+RAM_TEST_LAST_BANK equ $1E       ; Decimal 30. Bank 31 holds the stack window.
 RAM_TEST_FAIL_ADDR equ BUFFER+16
 RAM_TEST_EXPECTED equ BUFFER+18
 RAM_TEST_ACTUAL equ BUFFER+19
+RAM_TEST_CURRENT_BANK equ BUFFER+20
+RAM_TEST_ORIG_MMU_0 equ BUFFER+21
 
 _START:
     ; Initialize BIOS components
     jsr SERIAL_INIT
+    andcc #$FE                    ; Keep serial input/fallback on port A.
+    jsr SERIAL_START
     jsr PARALLEL_INIT
     jsr CF_INIT
 
     ; Print init message
     ldx #msg_init0
-    jsr SERIAL_PRINT_A
-    jsr SERIAL_PRINT_CRLF_A
+    jsr BIOS_CONSOLE_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_CRLF_A
+    lbra MAIN_MENU
+
+; -----------------------------------------------------------------
+; BIOS menu output routing
+; -----------------------------------------------------------------
+; The VDC is output-only in this first increment. SERIAL_INPUT_A remains the
+; menu input path. If an initialized VDC later times out, the failing output
+; operation disables it and retries through serial where possible.
+
+BIOS_CONSOLE_PRINT_A:
+    tst CONFIG_VDC_PRESENT_FLAG
+    beq BIOS_CONSOLE_PRINT_SERIAL
+    pshs x
+    jsr VDC_PRINT
+    bcs BIOS_CONSOLE_PRINT_VDC_FAIL
+    leas 2,s
+    rts
+BIOS_CONSOLE_PRINT_VDC_FAIL:
+    clr CONFIG_VDC_PRESENT_FLAG
+    puls x
+BIOS_CONSOLE_PRINT_SERIAL:
+    jmp SERIAL_PRINT_A
+
+BIOS_CONSOLE_PRINT_CHAR_A:
+    tst CONFIG_VDC_PRESENT_FLAG
+    beq BIOS_CONSOLE_PRINT_CHAR_SERIAL
+    pshs a
+    jsr VDC_PRINT_CHAR
+    bcs BIOS_CONSOLE_PRINT_CHAR_VDC_FAIL
+    leas 1,s
+    rts
+BIOS_CONSOLE_PRINT_CHAR_VDC_FAIL:
+    clr CONFIG_VDC_PRESENT_FLAG
+    puls a
+BIOS_CONSOLE_PRINT_CHAR_SERIAL:
+    jmp SERIAL_PRINT_CHAR_A
+
+BIOS_CONSOLE_PRINT_CRLF_A:
+    tst CONFIG_VDC_PRESENT_FLAG
+    beq BIOS_CONSOLE_PRINT_CRLF_SERIAL
+    jsr VDC_PRINT_CRLF
+    bcc BIOS_CONSOLE_PRINT_CRLF_DONE
+    clr CONFIG_VDC_PRESENT_FLAG
+BIOS_CONSOLE_PRINT_CRLF_SERIAL:
+    jmp SERIAL_PRINT_CRLF_A
+BIOS_CONSOLE_PRINT_CRLF_DONE:
+    rts
+
+BIOS_CONSOLE_CLEAR:
+    tst CONFIG_VDC_PRESENT_FLAG
+    beq BIOS_CONSOLE_CLEAR_DONE
+    jsr VDC_CLEAR_SCREEN
+    bcc BIOS_CONSOLE_CLEAR_DONE
+    clr CONFIG_VDC_PRESENT_FLAG
+BIOS_CONSOLE_CLEAR_DONE:
+    rts
 
     ; Main menu loop
 MAIN_MENU:
     ; Print menu
+    jsr BIOS_CONSOLE_CLEAR
     ldx #msg_line0
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text0
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_line2
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text1
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text2
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text3
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text4
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text5
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
+    ldx #msg_text6
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_line3
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_crlf0
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_prompt0
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
 
     ; Wait for user input
     ldx #BUFFER
@@ -74,7 +139,7 @@ MAIN_MENU:
     cmpa #'5'
     beq BOOT_MLOS
     cmpa #'6'
-    beq WOZMON
+    beq GRAPHIC_INIT
     cmpa #'0'
     beq EXIT_MENU
     bra MAIN_MENU
@@ -103,6 +168,10 @@ WOZMON:
     jsr WOZMON_UTIL
     lbra MAIN_MENU
 
+GRAPHIC_INIT:
+    jsr GRAPHICS
+    lbra MAIN_MENU
+
 EXIT_MENU:
     ; Exit to main system
     rts
@@ -116,8 +185,22 @@ RAM_TEST_UTIL:
     jsr SERIAL_PRINT_A
     jsr SERIAL_PRINT_CRLF_A
 
-    ; Destructive test over $0000-$0FFF. The address-derived patterns catch
-    ; more aliasing faults than a repeating fixed byte pattern.
+    jsr MMU_GET_REGISTER_0
+    sta RAM_TEST_ORIG_MMU_0
+    lda #RAM_TEST_FIRST_BANK
+    sta RAM_TEST_CURRENT_BANK
+
+RAM_TEST_BANK_LOOP:
+    jsr MMU_SET_REGISTER_0
+
+    ldx #msg_ram_test_bank
+    jsr SERIAL_PRINT_A
+    lda RAM_TEST_CURRENT_BANK
+    jsr SERIAL_PRINT_BYTE_HEX_A
+    jsr SERIAL_PRINT_CRLF_A
+
+    ; Destructive test over MMU0's $0000-$3FFF window. The address-derived
+    ; patterns catch more aliasing faults than a repeating fixed byte pattern.
     ldx #RAM_TEST_START
 RAM_TEST_FILL_LOW:
     tfr x,d
@@ -168,7 +251,16 @@ RAM_TEST_CLEAR:
     cmpx #RAM_TEST_END
     blo RAM_TEST_CLEAR
 
-    ; Success
+    lda RAM_TEST_CURRENT_BANK
+    cmpa #RAM_TEST_LAST_BANK
+    beq RAM_TEST_PASS
+    inca
+    sta RAM_TEST_CURRENT_BANK
+    bra RAM_TEST_BANK_LOOP
+
+RAM_TEST_PASS:
+    lda RAM_TEST_ORIG_MMU_0
+    jsr MMU_SET_REGISTER_0
     ldx #msg_ram_test_pass
     jsr SERIAL_PRINT_A
     jsr SERIAL_PRINT_CRLF_A
@@ -178,10 +270,17 @@ RAM_TEST_STORE_FAIL:
     ldb ,x
     std RAM_TEST_EXPECTED
     stx RAM_TEST_FAIL_ADDR
+    lda RAM_TEST_ORIG_MMU_0
+    jsr MMU_SET_REGISTER_0
 
 RAM_TEST_FAIL:
     ldx #msg_ram_test_fail
     jsr SERIAL_PRINT_A
+    jsr SERIAL_PRINT_CRLF_A
+    ldx #msg_ram_test_fail_bank
+    jsr SERIAL_PRINT_A
+    lda RAM_TEST_CURRENT_BANK
+    jsr SERIAL_PRINT_BYTE_HEX_A
     jsr SERIAL_PRINT_CRLF_A
     ldx #msg_ram_test_fail_addr
     jsr SERIAL_PRINT_A
@@ -315,6 +414,18 @@ WOZMON_UTIL:
     ; Jump to WozMon at $E800 (where it's loaded)
     jmp $E800
 
+GRAPHICS:
+    jsr VDC_DETECT
+    bcs GRAPHICS_FAIL
+    jsr VDC_INIT_TEXT
+    bcs GRAPHICS_FAIL
+    lda #$01
+    sta CONFIG_VDC_PRESENT_FLAG
+    rts
+GRAPHICS_FAIL:
+    clr CONFIG_VDC_PRESENT_FLAG
+    rts
+
 ; String table
 ; -----------------------------------------------------------------
 ; 40 col        |                                       |
@@ -329,7 +440,7 @@ WOZMON_UTIL:
 ; msg_text3: fcn "│ 3. Memory Dump                        │"
 ; msg_text4: fcn "│ 4. Joystick Test                      │"
 ; msg_text5: fcn "│ 5. Boot MLOS from CF                  │"
-; msg_text6: fcn "│ 6. WozMon                             │"
+; msg_text6: fcn "│ 6. Initialize Graphics                │"
 ; msg_prompt0: fcn "  Press a number to continue... "
 
 msg_line0: fcc "+---------------------------------------+"
@@ -352,7 +463,7 @@ msg_text4: fcc "* 4. Joystick Test                      *"
            fcb 10,13,0
 msg_text5: fcc "* 5. Boot MLOS from CF                  *"
            fcb 10,13,0
-msg_text6: fcc "* 6. WozMon                             *"
+msg_text6: fcc "* 6. Initialize Graphics                *"
            fcb 10,13,0
 msg_prompt0: fcc "  Press a number to continue... "
            fcb 10,13,0
@@ -365,6 +476,10 @@ msg_ram_test_pass: fcc "RAM Test PASSED!"
            fcb 10,13,0
 msg_ram_test_fail: fcc "RAM Test FAILED!"
            fcb 10,13,0
+msg_ram_test_bank: fcc "Testing RAM bank: "
+           fcb 0
+msg_ram_test_fail_bank: fcc "Bank: "
+           fcb 0
 msg_ram_test_fail_addr: fcc "Address: "
            fcb 0
 msg_ram_test_expected: fcc "Expected: "

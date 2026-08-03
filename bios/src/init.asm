@@ -46,7 +46,7 @@ INIT:
     ; 0x4000 - 0x7FFF = bank 1 -> 0x004000
     ; 0x8000 - 0xBFFF = bank 2 -> 0x008000
     ; 0xC000 - 0xDFFF = bank 3 -> 0x00C000 (0xE000 - 0xFFFF = ROM)
-    lda #$19
+    lda #$1F
 	sta MMU_REG_3
 	clra
     sta MMU_REG_0
@@ -61,8 +61,26 @@ INIT:
     ; Clear all registers
     jsr CLEAR_REGS
 
-	; Initialize the serial port
-	jsr SERIAL_INIT
+    ; Select the console output backend before rendering any boot messages.
+    ; VDC access is bounded, so an absent device cannot trap the BIOS here.
+    clr CONFIG_VDC_PRESENT_FLAG
+    jsr VDC_DETECT
+    bcs _NO_VDC
+    jsr VDC_INIT_TEXT
+    bcs _NO_VDC
+    lda #$01
+    sta CONFIG_VDC_PRESENT_FLAG
+    bra _CONSOLE_SELECTED
+
+_NO_VDC:
+    clr CONFIG_VDC_PRESENT_FLAG
+
+_CONSOLE_SELECTED:
+    ; Serial remains available for menu input and as the live fallback if an
+    ; initialized VDC later fails. It is not selected for rendering while the
+    ; VDC-present flag remains set.
+    jsr SERIAL_INIT
+    andcc #$FE                    ; SERIAL_START selects port A when C is clear.
     jsr SERIAL_START
 
 	; Initialize the parallel port
@@ -71,21 +89,30 @@ INIT:
     ; Initialize the led to Blue
     jsr SET_LED_GREEN
 
-    ; Print the initialization message
-    ; This is a message that will be printed to the serial port
     ldx #msg_init
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
+
+    tst CONFIG_VDC_PRESENT_FLAG
+    beq _REPORT_SERIAL_CONSOLE
+    ldx #msg_vdc_present
+    jsr BIOS_CONSOLE_PRINT_A
+    bra _END_VDC
+
+_REPORT_SERIAL_CONSOLE:
+    ldx #msg_no_vdc
+    jsr BIOS_CONSOLE_PRINT_A
+_END_VDC:
     
     ; Detect installed 512 KiB RAM chips and store the count in config RAM.
     jsr CONFIG_DETECT_RAM_CHIPS
     ; Print detected RAM chip count
     ldx #msg_mem_detect
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     lda CONFIG_RAM_CHIP_COUNT
     adda #'0'
-    jsr SERIAL_PRINT_CHAR_A
+    jsr BIOS_CONSOLE_PRINT_CHAR_A
     ldx #msg_line_break
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     
 
     ; Initialize the CompactFlash card
@@ -96,13 +123,13 @@ INIT:
     lda #$01
     sta CONFIG_CF_PRESENT_FLAG
     ldx #msg_cf_present
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
     jmp _END_CF
 
 _NO_CF:
     clr CONFIG_CF_PRESENT_FLAG
     ldx #msg_no_cf
-    jsr SERIAL_PRINT_A
+    jsr BIOS_CONSOLE_PRINT_A
 _END_CF:
 
     lbra _START
@@ -141,9 +168,20 @@ msg_init:
     fcc "Initializing microLind..."
     fcb 10,13,0
 
+VDC_FONT_LOADING_MESSAGE:
+    fcn "FONT..."
+
 msg_mem_detect:
     fcc "Detected RAM chips: "
     fcb 0
+msg_vdc_present:
+    fcc " * MOS 8568 VDC detected; BIOS menu output enabled."
+    fcb 10,13,0
+
+msg_no_vdc:
+    fcc " * No MOS 8568 VDC detected; using serial menu output."
+    fcb 10,13,0
+
 msg_cf_present:
     fcc " * CompactFlash card detected and initialized."
     fcb 10,13,0

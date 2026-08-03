@@ -12,9 +12,15 @@ set(BIOS_SOURCES
     driver/serial_xr88c92.asm
     driver/mmu.asm
     driver/parallel_6522.asm
+    driver/vdc.asm
+    driver/vdc_font.asm
     driver/irq.asm
     src/memory.asm
     src/init.asm
+)
+
+set(BIOS_RESOURCES
+    resources/petscii-swe.bin
 )
 
 set(BIOS_INCLUDE_DIRS
@@ -33,7 +39,7 @@ add_custom_command(
     OUTPUT "${BIOS_OUTPUT}"
     COMMAND ${CMAKE_COMMAND} -E echo "Running: lwasm -3 -f ${FORMAT} ${BIOS_INCLUDE_ARGS_DISPLAY} -o ${BIOS_OUTPUT} ${BIOS_SOURCES_DISPLAY}"
     COMMAND lwasm -3 -f "${FORMAT}" ${BIOS_INCLUDE_ARGS} -o "${BIOS_OUTPUT}" ${BIOS_SOURCES}
-    DEPENDS ${BIOS_SOURCES}
+    DEPENDS ${BIOS_SOURCES} ${BIOS_RESOURCES}
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     COMMENT "Building BIOS with lwasm"
     VERBATIM
