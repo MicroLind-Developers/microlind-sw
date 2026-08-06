@@ -3,7 +3,10 @@ BUFFER  =
 COUNT_L =
 COUNT_H =
 
-
+; Entry point for parser
+; Input:
+;  X = Address to inputbuffer (where srec is stored, null terminated)
+;  ( In future, input extra location offset ) 
 PARSE:  lda ,x+
         beq _PRS0       #null
         cmpa #$53       # 'S'
@@ -21,7 +24,7 @@ PARSE:  lda ,x+
 _entry: clrb            # symbol error
         lda ,x+
         cmpa #$53       # 'S'
-        lbne ERR        # error on no record hedder
+        lbne ERR        # error on no record header
         lda ,x+
         suba #$30       # recenter on '0'
         beq _PRS1       # error on second start record
@@ -30,7 +33,7 @@ _entry: clrb            # symbol error
         lbpl ERR        # error on value higher than '9'
         cmpa #$01       # check if '1'
         bne _PRS2       # if not hop to next check
-        jsr             # parse data record
+        jsr S1_PARSE    # parse data record
         jmp 
 _PRS2:  cmpa #$05       # check if '5'
         bne _PRS3       # if not hop to next check
@@ -42,7 +45,7 @@ _PRS3:  cmpa #$09       # check if '9'
         jmp 
 _PRS4:                  
         ldb #incorect_record_err        # parse rest of records or error
-        jmp ERR         # incorect record error, no other record types suported
+        jmp ERR         # incorrect record error, no other record types supported
 _PRS0:  ldb #no_records_err
         jmp ERR
 _PRS1:  ldb #second_start_err
@@ -50,8 +53,8 @@ _PRS1:  ldb #second_start_err
 
 ERR:    lslb
         ldx b,err_table
-        ; print
-        ; hang
+        ; print error 
+        ; exit srec
 
 S1_PARSE:
         ldy #BUFFER
@@ -122,6 +125,8 @@ S5_PARSE:
         lbne ERR
         rts
 
+
+; TODO: Add header parsing to print out module name and comments.
 S0_PARSE:
         lda ,x+         #load count
         ldb ,x+
@@ -139,7 +144,7 @@ _S0_0:  addr a,f        # add byte to checksum
         bcs ERR         #symbol error
         dece            # decrement count
         bne _S0_0       # loop if not last byte
-        comf            # checksum calculasion
+        comf            # checksum calculation
         cmpr a,f
         bne _SX_1       # if checksum is not equal, checksum error
         jsr _PARSE_TERMINATOR   # parse the terminator
@@ -189,7 +194,7 @@ ASCII_BYTE:     ; converts two ASCII hex characters in D to byte in A, sets carr
         andr b,a
         andcc #$fe
         rts
-_ASB0:  orcc #$00
+_ASB0:  orcc #$01
         rts
 
 ASCIIHEX:
