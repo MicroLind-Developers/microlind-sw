@@ -193,6 +193,10 @@ msg_no_cf:
 msg_line_break:
     fcb 10,13,0
 
+; Kept in the reset-vector ROM area to leave driver code below the I/O window.
+msg_prompt0: fcc "  Press a number to continue... "
+    fcb 10,13,0
+
 ; -----------------------------------------------------------------
 ; Vector table for the CPU
 ; -----------------------------------------------------------------

@@ -69,6 +69,18 @@ VDC_FONT_GLYPH_STRIDE       EQU 16
 VDC_DEFAULT_ATTRIBUTE       EQU $0F
 VDC_DEFAULT_CURSOR_MODE     EQU $60
 
+; VDC colors use a four-bit RGBI value: red, green, blue, intensity.
+VDC_COLOR_MASK              EQU $0F
+VDC_ATTRIBUTE_FLAGS_MASK    EQU $F0
+VDC_COLOR_INTENSITY         EQU $01
+VDC_COLOR_BLUE              EQU $02
+VDC_COLOR_GREEN             EQU $04
+VDC_COLOR_RED               EQU $08
+VDC_COLOR_BLACK             EQU $00
+VDC_COLOR_DARK_GRAY         EQU VDC_COLOR_INTENSITY
+VDC_COLOR_LIGHT_GRAY        EQU VDC_COLOR_RED+VDC_COLOR_GREEN+VDC_COLOR_BLUE
+VDC_COLOR_WHITE             EQU VDC_COLOR_LIGHT_GRAY+VDC_COLOR_INTENSITY
+
 VDC_ASCII_SPACE             EQU $20
 VDC_ASCII_QUESTION          EQU $3F
 VDC_ASCII_DELETE            EQU $7F
@@ -482,6 +494,46 @@ VDC_HOME:
     jmp VDC_UPDATE_CURSOR
 
 ; -----------------------------------------------------------------
+; VDC_SET_FOREGROUND_COLOR
+; Select the RGBI color stored with subsequently written characters.
+;
+; Input: A = RGBI color (low nibble; high nibble is ignored)
+; Output: C clear
+; Clobbers: A,B,CC
+; -----------------------------------------------------------------
+VDC_SET_FOREGROUND_COLOR:
+    anda #VDC_COLOR_MASK
+    ldb VDC_CURRENT_ATTRIBUTE
+    andb #VDC_ATTRIBUTE_FLAGS_MASK
+    orr a,b
+    stb VDC_CURRENT_ATTRIBUTE
+    andcc #$FE
+    rts
+
+; -----------------------------------------------------------------
+; VDC_SET_BACKGROUND_COLOR
+; Set the global display background while preserving register 26's
+; foreground nibble (used when attributes are disabled).
+;
+; Input: A = RGBI color (low nibble; high nibble is ignored)
+; Output: C clear = success, C set = timeout
+; Clobbers: A,B,CC
+; -----------------------------------------------------------------
+VDC_SET_BACKGROUND_COLOR:
+    anda #VDC_COLOR_MASK
+    pshs a
+    lda #VDC_REG_COLOR
+    jsr VDC_READ
+    bcs VDC_SET_BACKGROUND_COLOR_FAIL
+    andb #VDC_ATTRIBUTE_FLAGS_MASK
+    orb ,s+
+    lda #VDC_REG_COLOR
+    jmp VDC_WRITE
+VDC_SET_BACKGROUND_COLOR_FAIL:
+    leas 1,s
+    rts
+
+; -----------------------------------------------------------------
 ; VDC_CLEAR_SCREEN
 ; Fill the visible character and attribute planes, then home the cursor.
 ; -----------------------------------------------------------------
@@ -609,6 +661,10 @@ VDC_PRINT_CHAR_STORE:
     lda VDC_TEMP_CHAR
     jsr VDC_WRITE_VRAM_BYTE
     bcs VDC_PRINT_CHAR_FAIL
+    leax VDC_ATTRIBUTE_BASE-VDC_SCREEN_BASE,x
+    lda VDC_CURRENT_ATTRIBUTE
+    jsr VDC_WRITE_VRAM_BYTE
+    bcs VDC_PRINT_CHAR_FAIL
     inc VDC_CURSOR_COLUMN
     lda VDC_CURSOR_COLUMN
     cmpa #VDC_TEXT_COLUMNS
@@ -705,17 +761,6 @@ VDC_INIT_TEXT_FAIL:
     clr VDC_INITIALIZED_FLAG
     puls d,x,y,u
     orcc #$01
-    rts
-
-; Keep the graphics entry point for callers that explicitly need it, but
-; graphics-mode framebuffer support is outside the current text-only scope.
-VDC_INIT_GRAPHICS:
-    lda #VDC_REG_HORIZONTAL_SCROLL
-    jsr VDC_READ
-    bcs VDC_INIT_GRAPHICS_DONE
-    orb #$80
-    jsr VDC_WRITE
-VDC_INIT_GRAPHICS_DONE:
     rts
 
 ; Standard C128 PAL 80-column timing adapted from Commodore's original

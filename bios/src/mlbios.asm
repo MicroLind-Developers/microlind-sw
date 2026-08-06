@@ -94,6 +94,8 @@ BIOS_CONSOLE_CLEAR_DONE:
     ; Main menu loop
 MAIN_MENU:
     ; Print menu
+    lda #VDC_COLOR_RED
+    jsr VDC_SET_FOREGROUND_COLOR
     jsr BIOS_CONSOLE_CLEAR
     ldx #msg_line0
     jsr BIOS_CONSOLE_PRINT_A
@@ -101,6 +103,8 @@ MAIN_MENU:
     jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_line2
     jsr BIOS_CONSOLE_PRINT_A
+    lda VDC_COLOR_WHITE
+    jsr VDC_SET_FOREGROUND_COLOR
     ldx #msg_text1
     jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text2
@@ -142,7 +146,7 @@ MAIN_MENU:
     beq GRAPHIC_INIT
     cmpa #'0'
     beq EXIT_MENU
-    bra MAIN_MENU
+    lbra MAIN_MENU
 
 RAM_TEST:
     jsr RAM_TEST_UTIL
@@ -464,8 +468,6 @@ msg_text4: fcc "* 4. Joystick Test                      *"
 msg_text5: fcc "* 5. Boot MLOS from CF                  *"
            fcb 10,13,0
 msg_text6: fcc "* 6. Initialize Graphics                *"
-           fcb 10,13,0
-msg_prompt0: fcc "  Press a number to continue... "
            fcb 10,13,0
 
 msg_init0: fcc "microLind BIOS Utility Menu"
