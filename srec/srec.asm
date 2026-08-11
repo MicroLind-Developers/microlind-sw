@@ -34,16 +34,16 @@ _entry: clrb            # symbol error
         cmpa #$01       # check if '1'
         bne _PRS2       # if not hop to next check
         jsr S1_PARSE    # parse data record
-        jmp 
+        bra _entry 
 _PRS2:  cmpa #$05       # check if '5'
         bne _PRS3       # if not hop to next check
-        jsr             # parse count record
-        jmp 
+        jsr S5_PARSE    # parse count record
+        bra _entry
 _PRS3:  cmpa #$09       # check if '9'
         bne _PRS4       # if not hop to next check
-        jsr             # parse 16-bit terminator
-        jmp 
-_PRS4:                  
+        jsr S9_PARSE    # parse 16-bit terminator
+        bra _entry 
+_PRS4:  
         ldb #incorect_record_err        # parse rest of records or error
         jmp ERR         # incorrect record error, no other record types supported
 _PRS0:  ldb #no_records_err
@@ -57,76 +57,83 @@ ERR:    lslb
         ; exit srec
 
 S1_PARSE:
-        ldy #BUFFER
-        lda ,x+
+        ldy #BUFFER     # load temp buffer addres
+        lda ,x+         # get count
         ldb ,x+
         jsr ASCII_BYTE
         clrb
-        lbcs ERR
-        tfr a,e #count
+        lbcs ERR        # symbol error
+        tfr a,e         # transfer count to e
         clra
-        clrf #checksum
-        bra _S1_1
-_S1_0:  addr a,f
-        sta ,-y
+        clrf            # clear f to hold checksum
+        bra _S1_1       # enter loop
+_S1_0:  addr a,f        # add value to checksum
+        sta ,-y         # store value in buffer
 _S1_1:  lda ,x+
         ldb ,x+
         jsr ASCII_BYTE
         clrb
-        bcs ERR
+        bcs ERR         # symbol error
         dece
-        bne _S1_0 # loop
-        comf    # checksum calculasion
-        cmpr a,f
-        bne _SX_1
-        pshs x
-        ldx #BUFFER
-        jsr  # write BUFEFR to addres stored in first bytes of BUFFER
-        puls x
-        jsr _PARSE_TERMINATOR
-        ldb #length_err
-        lbcs ERR
-        inc COUNT_L
-        bne _S1_2
-        inc COUNT_H
-_S1_2:  rts
+        bne _S1_0       # loop if count is not zero
+        comf            # checksum calculasion
+        cmpr a,f        # compare checksum
+        bne _SX_1       #   if wrong, checksum error
+        pshs x          # store x
+        ldx #BUFFER     # load buffer addres in x
+        jsr             # write BUFEFR to addres stored in first bytes of BUFFER
+        puls x          # restore x
+        jsr _PARSE_TERMINATOR   # parse the terminator
+        ldb #length_err # terminator parsed corectly?
+        lbcs ERR        #   if not, length error
+        inc COUNT_L     # increment count
+        beq _S1_2       # if overflow increment high byte
+        rts
+_S1_2:  inc COUNT_H
+        rts
 
 S5_PARSE:
-        lda ,x+         # length
+        lda ,x+         # load count
         ldb ,x+
         jsr ASCII_BYTE
         clrb
-        lbcs ERR
+        lbcs ERR        # symbol error
         ldb #length_err
-        cmpa #$03
-        lbne ERR
+        cmpa #$03       # length fixed
+        lbne ERR        #   if wrong, length error
         ldf #$03
         lda ,x+         # count high
         ldb ,x+
         jsr ASCII_BYTE
         clrb
-        lbcs ERR
+        lbcs ERR        # symbol error
         ldb #mising_data_err
-        cmpa COUNT_H
-        lbne ERR
-        addr a,f
-        lda ,x+         #count low
+        cmpa COUNT_H    # compare counts to see if a record was lost
+        lbne ERR        #   if so, data error
+        addr a,f        # add byte to checksum
+        lda ,x+         # count low
         ldb ,x+
         jsr ASCII_BYTE
         clrb
-        lbcs ERR
+        lbcs ERR        # symbol error
         ldb #mising_data_err
-        cmpa COUNT_L
-        lbne ERR
+        cmpa COUNT_L    # compare counts to see if a record was lost
+        lbne ERR        #   if so, data error
         addr a,f
-        comf    # checksum calculasion
+        comf            # checksum calculasion
         cmpr a,f
         ldb #checksum_err
-        lbne ERR
+        lbne ERR        # error on bad checksum
+        jsr _PARSE_TERMINATOR   # parse the terminator
+        ldb #length_err # terminator parsed corectly?
+        lbcs ERR        #   if not, length error
         rts
+
+S9_PARSE:
 
 
 ; TODO: Add header parsing to print out module name and comments.
+
 S0_PARSE:
         lda ,x+         #load count
         ldb ,x+
@@ -148,8 +155,8 @@ _S0_0:  addr a,f        # add byte to checksum
         cmpr a,f
         bne _SX_1       # if checksum is not equal, checksum error
         jsr _PARSE_TERMINATOR   # parse the terminator
-        ldb #length_err # terminator not parsed corectly?
-        lbcs ERR        # length error
+        ldb #length_err # terminator parsed corectly?
+        lbcs ERR        #   if not, length error
         rts
 _SX_1:  ldb #checksum_err
         lbra ERR
