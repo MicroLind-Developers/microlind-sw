@@ -290,6 +290,17 @@ _parallel_reset_interrupt:
     jsr  PARALLEL_RESET_INTERRUPT
     rts
 
+; void beep(uint16_t duration_ms, uint16_t frequency_hz)
+    export _beep
+_beep:
+    pshs u
+    leau ,s
+    ldx  2,u      ; duration_ms
+    ldd  4,u      ; frequency_hz
+    jsr  PARALLEL_BEEP
+    leas ,u
+	puls u,pc
+
 ; uint8_t parallel_get_port_a(void)
     export _parallel_get_port_a
 _parallel_get_port_a:

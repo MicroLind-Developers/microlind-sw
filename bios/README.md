@@ -108,6 +108,7 @@ Parallel / joystick:
 - `parallel_enable_timer_interrupt`
 - `parallel_disable_timer_interrupt`
 - `parallel_reset_interrupt`
+- `beep(duration_ms, frequency_hz)` (PC speaker on VIA PB7; blocking)
 - `parallel_get_port_a`
 - `read_joy1`
 - `read_joy2`

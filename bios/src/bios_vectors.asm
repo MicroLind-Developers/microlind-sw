@@ -64,4 +64,7 @@ BIOS_JUMPTAB_BASE  EQU $F800
             jmp _irq_get_active
             jmp _irq_get_current_filter
 
+; PC speaker (append-only: preserve all earlier BIOS jump-table indices)
+            jmp _beep
+
 

@@ -61,6 +61,12 @@ INIT:
     ; Clear all registers
     jsr CLEAR_REGS
 
+    ; Initialize the VIA and play a power-on tone before choosing a console.
+    jsr PARALLEL_INIT
+    ldx #300
+    ldd #440
+    jsr PARALLEL_BEEP
+
     ; Select the console output backend before rendering any boot messages.
     ; VDC access is bounded, so an absent device cannot trap the BIOS here.
     clr CONFIG_VDC_PRESENT_FLAG

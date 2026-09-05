@@ -14,8 +14,8 @@ PARALLEL_ORB            EQU PARALLEL_BASE+0
 PARALLEL_IRB            EQU PARALLEL_BASE+0
 PARALLEL_ORA            EQU PARALLEL_BASE+1
 PARALLEL_IRA            EQU PARALLEL_BASE+1
-PARALLEL_DDRA           EQU PARALLEL_BASE+2
-PARALLEL_DDRB           EQU PARALLEL_BASE+3
+PARALLEL_DDRB           EQU PARALLEL_BASE+2
+PARALLEL_DDRA           EQU PARALLEL_BASE+3
 PARALLEL_T1CL           EQU PARALLEL_BASE+4
 PARALLEL_T1CH           EQU PARALLEL_BASE+5
 PARALLEL_T1LL           EQU PARALLEL_BASE+6
@@ -29,6 +29,14 @@ PARALLEL_IFR            EQU PARALLEL_BASE+13
 PARALLEL_IER            EQU PARALLEL_BASE+14
 
 TIMER_1_IRQ             EQU $40
+TIMER_2_IRQ             EQU $20
+
+; The VIA is clocked from the 2 MHz system clock.  Timer 1 toggles PB7 on
+; every timeout, so its reload value is VIA_CLOCK_HZ / (2 * frequency_hz).
+PARALLEL_VIA_CLOCK_HZ           EQU 2000000
+PARALLEL_TIMER_TICKS_PER_MS     EQU PARALLEL_VIA_CLOCK_HZ/1000
+PARALLEL_BEEP_T1_ACR_BITS       EQU $C0    ; T1 free-run + PB7 timer output
+PARALLEL_BEEP_PB7               EQU $80
 
 SPI_TFR_READY           EQU $0000 ; Hold the SPI transfer ready flag
 MAX_TFR_RETRIES         EQU $FF
@@ -58,6 +66,7 @@ PARALLEL_INIT:
         ; Clear interrupts (write with bit 7 = 0 to disable specific sources)
         lda   #$7F
         sta   PARALLEL_IER     ; IER — disable all
+        rts
 
 
 ; -----------------------------------------------------------------
@@ -159,6 +168,136 @@ PARALLEL_RESET_INTERRUPT:
 ; -----------------------------------------------------------------
 PARALLEL_GET_PORT_A:
         lda PARALLEL_ORA
+        rts
+
+
+; -----------------------------------------------------------------
+; PARALLEL_BEEP (blocking)
+; Drive the PC speaker connected to VIA PB7 for a requested time.
+;
+; input:            X = duration in milliseconds
+;                   D = frequency in hertz
+; output:           None
+; clobbers:         A, B, D, W, X, Y, CC
+;
+; Timer 1 is put in free-running mode with its PB7 output enabled. Timer 2
+; is used as a polled 1 ms one-shot, so the duration does not depend on an
+; instruction-counted delay loop.  The routine is blocking and temporarily
+; owns both VIA timers. It restores ACR, ORB, DDRB, and Timer 1/2 interrupt
+; enables before returning.
+;
+; The valid frequency range is 16 Hz through 32767 Hz. Values below 16 Hz
+; are clamped to 16 Hz; values above 32767 Hz are clamped to 32767 Hz. A zero
+; duration or frequency is a no-op.
+; -----------------------------------------------------------------
+PARALLEL_BEEP:
+        cmpx    #$0000
+        lbeq    _PARALLEL_BEEP_DONE
+        tstd
+        lbeq    _PARALLEL_BEEP_DONE
+
+        tfr     x,y                     ; retain duration for the ms loop
+        pshs    d                       ; [4,s] frequency (after saved state)
+        lda     PARALLEL_ACR
+        pshs    a                       ; [3,s]
+        lda     PARALLEL_DDRB
+        pshs    a                       ; [2,s]
+        lda     PARALLEL_ORB
+        pshs    a                       ; [1,s]
+        lda     PARALLEL_IER
+        pshs    a                       ; [0,s]
+
+        ; DIVQ is signed. Keep both its divisor and quotient positive while
+        ; still covering the full 16-bit timer reload range.
+        ldd     4,s
+        cmpd    #16
+        bhs     _PARALLEL_BEEP_MIN_OK
+        ldd     #16
+        std     4,s
+_PARALLEL_BEEP_MIN_OK:
+        cmpd    #$7FFF
+        bls     _PARALLEL_BEEP_MAX_OK
+        ldd     #$7FFF
+        std     4,s
+_PARALLEL_BEEP_MAX_OK:
+        cmpd    #31
+        bhs     _PARALLEL_BEEP_DIVIDE_FULL
+
+        ; For 16..30 Hz, halve the dividend and double the quotient. This
+        ; avoids DIVQ's signed 16-bit quotient overflow at low frequencies.
+        ldq     #PARALLEL_VIA_CLOCK_HZ/4
+        divq    4,s
+        tfr     w,d
+        lsld
+        bra     _PARALLEL_BEEP_PERIOD_READY
+
+_PARALLEL_BEEP_DIVIDE_FULL:
+        ldq     #PARALLEL_VIA_CLOCK_HZ/2
+        divq    4,s
+        tfr     w,d
+
+_PARALLEL_BEEP_PERIOD_READY:
+        tfr     d,w                     ; preserve reload while configuring VIA
+        ; Keep any existing non-Timer-1 ACR configuration (for example SPI).
+        lda     PARALLEL_ACR
+        anda    #$3F
+        ora     #PARALLEL_BEEP_T1_ACR_BITS
+        sta     PARALLEL_ACR
+        lda     PARALLEL_DDRB
+        ora     #PARALLEL_BEEP_PB7
+        sta     PARALLEL_DDRB
+
+        ; Do not let the timer flags invoke the IRQ handler while polling.
+        lda     #TIMER_1_IRQ
+        sta     PARALLEL_IER
+        lda     #TIMER_2_IRQ
+        sta     PARALLEL_IER
+        lda     #TIMER_1_IRQ+TIMER_2_IRQ
+        sta     PARALLEL_IFR
+
+        ; Writing T1CH starts Timer 1. PB7 then toggles every half-period.
+        tfr     w,d
+        stb     PARALLEL_T1CL
+        sta     PARALLEL_T1CH
+
+_PARALLEL_BEEP_MS_LOOP:
+        ldd     #PARALLEL_TIMER_TICKS_PER_MS
+        stb     PARALLEL_T2CL
+        sta     PARALLEL_T2CH
+_PARALLEL_BEEP_WAIT_MS:
+        lda     PARALLEL_IFR
+        bita    #TIMER_2_IRQ
+        beq     _PARALLEL_BEEP_WAIT_MS
+        lda     #TIMER_2_IRQ
+        sta     PARALLEL_IFR
+        leay    -1,y
+        bne     _PARALLEL_BEEP_MS_LOOP
+
+        ; Stop the PB7 timer output before restoring the port state.
+        lda     #TIMER_1_IRQ+TIMER_2_IRQ
+        sta     PARALLEL_IFR
+        lda     3,s
+        sta     PARALLEL_ACR
+        lda     1,s
+        sta     PARALLEL_ORB
+        lda     2,s
+        sta     PARALLEL_DDRB
+
+        ; Restore only the two IER bits this routine temporarily cleared.
+        lda     0,s
+        bita    #TIMER_1_IRQ
+        beq     _PARALLEL_BEEP_T2_IER
+        lda     #$80+TIMER_1_IRQ
+        sta     PARALLEL_IER
+_PARALLEL_BEEP_T2_IER:
+        lda     0,s
+        bita    #TIMER_2_IRQ
+        beq     _PARALLEL_BEEP_RESTORE_DONE
+        lda     #$80+TIMER_2_IRQ
+        sta     PARALLEL_IER
+_PARALLEL_BEEP_RESTORE_DONE:
+        leas    6,s
+_PARALLEL_BEEP_DONE:
         rts
 
 

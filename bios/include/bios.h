@@ -47,6 +47,8 @@ void parallel_init(void);
 void parallel_enable_timer_interrupt(void);
 void parallel_disable_timer_interrupt(void);
 void parallel_reset_interrupt(void);
+/* Blocking PC-speaker tone on VIA PB7. duration is in ms, frequency in Hz. */
+void beep(uint16_t duration_ms, uint16_t frequency_hz);
 uint8_t parallel_get_port_a(void);
 uint8_t read_joy1(void);
 uint8_t read_joy2(void);
@@ -67,6 +69,7 @@ typedef void (*bios_vfn_u8)(uint8_t);
 typedef void (*bios_vfn_u8_u8)(uint8_t, uint8_t);
 typedef void (*bios_vfn_buf_u16)(char*, uint16_t);
 typedef void (*bios_vfn_u16)(uint16_t);
+typedef void (*bios_vfn_u16_u16)(uint16_t, uint16_t);
 
 #ifndef BIOS_JUMPTAB_BASE
 #define BIOS_JUMPTAB_BASE 0xF800u
@@ -119,6 +122,7 @@ typedef void (*bios_vfn_u16)(uint16_t);
 #define bios_irq_set_filter               ((bios_vfn_u8)BIOS_JUMPTAB_ADDR(38))
 #define bios_irq_get_active               ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(39))
 #define bios_irq_get_current_filter       ((uint8_t (*)(void))BIOS_JUMPTAB_ADDR(40))
+#define bios_beep                         ((bios_vfn_u16_u16)BIOS_JUMPTAB_ADDR(41))
 
 #endif /* MICROLIND_USE_BIOS_JUMPTAB */
 
