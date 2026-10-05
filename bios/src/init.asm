@@ -188,6 +188,8 @@ msg_line_break:
 ; -----------------------------------------------------------------
 ; Vector table for the CPU
 ; -----------------------------------------------------------------
+    include "tetris_launch.asm"
+
 BIOS_RESET_END:
     ifgt BIOS_RESET_END-$FFF0
         error "BIOS reset code overlaps CPU vectors"

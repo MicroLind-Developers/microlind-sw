@@ -176,12 +176,17 @@ Build and run the host regression checks:
 make -C bios test
 ```
 
-`make -C bios` also builds the RAM-resident `biosfs.mlp` extension and the
-CMOC acceptance application `fsdiag.mlp`. Their services, serial commands,
+`make -C bios` also builds the RAM-resident `biosfs.mlp` extension, the
+CMOC acceptance application `fsdiag.mlp`, and the game `tetris.mlp`.
+Their services, serial commands,
 image builder, and board acceptance steps are documented in
 [modules/filesystem/README.md](modules/filesystem/README.md). The complete Make
 build requires CMOC; `make -C bios filesystem` builds just the assembly module.
 Run the simulator integration tests with `make -C bios test-fs`.
+The game, VDC-enabled simulator setup, controls, and save format are documented
+in [modules/tetris/README.md](modules/tetris/README.md). Run its host and HD6309
+checks with `make -C bios test-tetris`. BIOS menu **8** launches the game;
+filesystem-console command **g** does the same and restores its caller's mount.
 
 Or build the standalone CMake project:
 
@@ -257,8 +262,10 @@ absolute `JMP`. `include/module.inc` defines the addresses; these calls do
 
 CF transfers preserve Y, U, and W, advance X by 512 on success, and use bounded
 waits before and after the data phase. The write service assumes the board's
-existing byte-wide PIO configuration and must be verified on hardware before
-gameplay implementation; run the generated filesystem diagnostic for this check. Driver comments document other register clobbers.
+existing byte-wide PIO configuration and still requires hardware validation;
+the user has deferred that checkpoint while gameplay proceeds with simulator
+checks. Run the generated filesystem diagnostic for the board check.
+Driver comments document other register clobbers.
 
 IRQ installation preserves CC and does not enable interrupts. A module must
 configure its peripheral, provide an RTI handler, and restore the previous

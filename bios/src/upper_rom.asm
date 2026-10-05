@@ -30,6 +30,7 @@ BIOS_LOAD_FS_UTIL:
     ldy #0
     jsr BIOS_RUN_MODULE
     bcc BIOS_LOAD_FS_DONE
+BIOS_LOAD_FS_ERROR:
     pshs a
     ldx #BL_LOAD_ERROR
     jsr SERIAL_PRINT_A

@@ -119,6 +119,8 @@ MAIN_MENU:
     jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text7
     jsr BIOS_CONSOLE_PRINT_A
+    ldx #msg_text8
+    jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_line3
     jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_crlf0
@@ -148,6 +150,8 @@ MAIN_MENU:
     beq GRAPHIC_INIT
     cmpa #'7'
     beq LOAD_FILESYSTEM
+    cmpa #'8'
+    beq LOAD_TETRIS
     cmpa #'0'
     beq EXIT_MENU
     lbra MAIN_MENU
@@ -182,6 +186,10 @@ GRAPHIC_INIT:
 
 LOAD_FILESYSTEM:
     jsr BIOS_LOAD_FS_UTIL
+    lbra MAIN_MENU
+
+LOAD_TETRIS:
+    jsr BIOS_LOAD_TETRIS_UTIL
     lbra MAIN_MENU
 
 EXIT_MENU:

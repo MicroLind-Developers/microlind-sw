@@ -86,6 +86,8 @@ F_CON_DISPATCH:
     lbeq F_CON_APPEND
     cmpa #'t'
     lbeq F_CON_DIAGNOSTIC
+    cmpa #'g'
+    lbeq F_CON_GAME
     tsta
     lbeq F_CON_PROMPT
     ldx #F_CON_HELP
@@ -261,6 +263,27 @@ F_CON_CREATE:
 ; clobbers:         D, W, X, Y, U, CC; DP is preserved
 ; -------------------------------------------------------
 F_CON_DIAGNOSTIC:
+    ldx #F_DIAGNOSTIC_PATH
+    bra F_CON_RUN_APP
+
+; -------------------------------------------------------
+;  Launch the CF-loaded game and restore the console's selected partition.
+; -------------------------------------------------------
+; input:            Initialized BIOS services and filesystem console state
+; output:           Game output or error; resumes the filesystem prompt
+; clobbers:         D, W, X, Y, U, CC; DP preserved
+; -------------------------------------------------------
+F_CON_GAME:
+    ldx #F_TETRIS_PATH
+
+; -------------------------------------------------------
+;  Run an application with the filesystem descriptor and restore its caller mount.
+; -------------------------------------------------------
+; input:            X=root application filename; F_BIOS_API; F_PART_INDEX
+; output:           Application result or error; continues at F_CON_PROMPT
+; clobbers:         D, W, X, Y, U, CC; DP preserved
+; -------------------------------------------------------
+F_CON_RUN_APP:
     ldu F_BIOS_API
     ldd 6,u
     cmpd #BIOS_MODULE_API_COUNT
@@ -271,7 +294,6 @@ F_CON_DIAGNOSTIC_READY:
     ldb F_PART_INDEX
     pshs b
     leau BIOS_MODULE_RUN-BIOS_MODULE_API_BASE,u
-    ldx #F_DIAGNOSTIC_PATH
     ldb #MLP_KIND_APPLICATION
     ldy #FS_API_BASE
     jsr ,u
@@ -548,7 +570,7 @@ F_CON_BANNER:
 F_CON_HELP:
     fcc "m [0..15], l [path], s path, c path, i, n file, d dir, u file, r dir"
     fcb 13,10
-    fcc "v source destination, w file text, a file text, t diagnostic, q"
+    fcc "v source destination, w file text, a file text, t diagnostic, g tetris, q"
     fcb 13,10,0
 F_CON_PROMPT_TEXT: fcn "mlfs> "
 F_CON_MOUNTED: fcc "Mounted."
@@ -559,3 +581,4 @@ F_CON_ERROR_TEXT: fcn "Error: "
 F_CON_OK: fcc "OK."
     fcb 13,10,0
 F_DIAGNOSTIC_PATH: fcn "/fsdiag.mlp"
+F_TETRIS_PATH: fcn "/tetris.mlp"

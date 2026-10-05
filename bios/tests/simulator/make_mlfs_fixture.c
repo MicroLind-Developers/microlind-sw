@@ -20,7 +20,7 @@ static int write_sectors(void *context, uint64_t lba, uint32_t count, const void
            fwrite(buffer, 512, count, file) != count ? -1 : 0;
 }
 
-static int add_diagnostic(mlfs_t *fs, const char *path)
+static int add_application(mlfs_t *fs, const char *name, const char *path)
 {
     FILE *file = fopen(path, "rb");
     if (!file || fseeko(file, 0, SEEK_END)) return 1;
@@ -30,15 +30,15 @@ static int add_diagnostic(mlfs_t *fs, const char *path)
     if (!data || fread(data, 1, (size_t)size, file) != (size_t)size) return 1;
     fclose(file);
     uint32_t blocks = (uint32_t)((size + fs->bytes_per_block - 1) / fs->bytes_per_block);
-    int failed = mlfs_create_empty_file(fs, "fsdiag.mlp", blocks) ||
-                 mlfs_pwrite_file(fs, "fsdiag.mlp", data, (size_t)size, 0) != size;
+    int failed = mlfs_create_empty_file(fs, name, blocks) ||
+                 mlfs_pwrite_file(fs, name, data, (size_t)size, 0) != size;
     free(data);
     return failed;
 }
 
 int main(int argc, char **argv)
 {
-    if (argc < 5 || argc > 8) return 1; /* Optional data, test blocks, diagnostic. */
+    if (argc < 5 || argc > 9) return 1; /* Optional data, test blocks, diagnostic, game. */
     unsigned log2 = (unsigned)strtoul(argv[2], NULL, 0);
     unsigned slot = (unsigned)strtoul(argv[4], NULL, 0);
     if (log2 < 9 || log2 > 16 || slot > 7) return 1;
@@ -67,7 +67,19 @@ int main(int argc, char **argv)
     if (!disk) return 1;
     uint32_t primary_blocks = 96;
     if (data) {
-        uint32_t wanted = (uint32_t)((data_length * 2 + (1u << log2) - 1) >> log2) + 32;
+        /* Include every module instead of assuming a fixed payload allowance. */
+        uint32_t wanted = 2 * (uint32_t)((data_length + (1u << log2) - 1) >> log2);
+        wanted += (uint32_t)((length + (1u << log2) - 1) >> log2) + 16;
+        for (int argument = 7; argument < argc; ++argument) {
+            if (!argv[argument][0]) continue;
+            FILE *extra = fopen(argv[argument], "rb");
+            if (!extra || fseeko(extra, 0, SEEK_END)) return 1;
+            off_t size = ftello(extra);
+            fclose(extra);
+            if (size < 1 || size > 65535) return 1;
+            wanted += (uint32_t)((size + (1u << log2) - 1) >> log2);
+        }
+        if (argc == 9) wanted += (1024u + (1u << log2) - 1) >> log2;
         if (wanted > primary_blocks) primary_blocks = wanted;
     }
     uint32_t sectors = 1 + (primary_blocks << (log2 - 9));
@@ -95,7 +107,14 @@ int main(int argc, char **argv)
             mlfs_create_directory(&fs, "docs/sub", 1) ||
             mlfs_create_empty_file(&fs, "docs/sub/data.bin", blocks) ||
             mlfs_pwrite_file(&fs, "docs/sub/data.bin", data, data_length, 0) != (ssize_t)data_length) return 1;
-        if (argc == 8 && add_diagnostic(&fs, argv[7])) return 1;
+        if (argc >= 8 && argv[7][0] && add_application(&fs, "fsdiag.mlp", argv[7])) return 1;
+        if (argc == 9) {
+            unsigned char empty_save[1024] = {0};
+            if (add_application(&fs, "tetris.mlp", argv[8]) ||
+                mlfs_create_empty_file(&fs, "tetris.dat", (1024u + (1u << log2) - 1) >> log2) ||
+                mlfs_pwrite_file(&fs, "tetris.dat", empty_save, sizeof empty_save, 0) != sizeof empty_save)
+                return 1;
+        }
         if (mlfs_add_partition(&io, sectors, diagnostic_blocks, (uint8_t)log2, "diagnostics") ||
             mlfs_mkfs(&io, 1, &fs) ||
             mlfs_create_empty_file(&fs, "other.txt", 1) ||

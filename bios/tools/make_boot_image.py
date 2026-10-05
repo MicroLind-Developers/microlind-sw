@@ -12,6 +12,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--filesystem", required=True, type=Path)
     parser.add_argument("--diagnostic", type=Path, help="Optional fsdiag.mlp acceptance module")
+    parser.add_argument("--game", type=Path, help="Optional tetris.mlp game and preallocated save file")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--log2", type=int, choices=range(9, 17), default=9)
     parser.add_argument("--data", type=Path, help="Optional data.bin sample, up to 1 MB")
@@ -26,6 +27,9 @@ def main():
         diagnostic = args.diagnostic.resolve(strict=True) if args.diagnostic else None
         if diagnostic and unpack_module(diagnostic.read_bytes())[0] != 1:
             raise ValueError("fsdiag.mlp must be an application module")
+        game = args.game.resolve(strict=True) if args.game else None
+        if game and unpack_module(game.read_bytes())[0] != 1:
+            raise ValueError("tetris.mlp must be an application module")
         output = args.output.resolve()
         if output.exists() and not args.force:
             raise ValueError("output already exists; use --force to replace it")
@@ -45,8 +49,10 @@ def main():
             sample.write_bytes(data)
             image = work / "cf.img"
             command = [str(builder), str(image), str(args.log2), str(module), "0", str(sample), "32"]
-            if diagnostic:
-                command.append(str(diagnostic))
+            if diagnostic or game:
+                command.append(str(diagnostic) if diagnostic else "")
+            if game:
+                command.append(str(game))
             subprocess.run(command,
                            check=True, timeout=30)
             image.replace(output)

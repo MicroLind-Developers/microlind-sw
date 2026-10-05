@@ -1,7 +1,8 @@
 # Filesystem board acceptance
 
-Gameplay implementation is waiting for this hardware checkpoint. Simulator
-validation is complete; physical board results have not been reported yet.
+The user has deferred this hardware checkpoint and authorized gameplay
+implementation using host and simulator checks. These physical board checks
+remain pending for hardware acceptance.
 
 ## Build and prepare the images
 
@@ -105,5 +106,6 @@ Record the board revision, CF model, serial settings, and the bundle's
 | `cf-65536.img` | Pending | Pending | Pending | Pending | Pending |
 
 Report any failure with the command, stage/status, block size, and whether it
-happened before or after a successful run. Once the agreed board checks pass,
-continue with the game stages in [the implementation plan](mlfs_bios_extension_and_tetris.md).
+happened before or after a successful run. Game development proceeds according
+to [the implementation plan](mlfs_bios_extension_and_tetris.md) while this
+hardware milestone remains deferred.

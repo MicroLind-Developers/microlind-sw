@@ -37,14 +37,14 @@ The BIOS will load `/biosfs.mlp` and `/tetris.mlp` from MLFS partition 0. Filesy
 - Use joystick 1: left/right move, down soft-drops, button rotates, and an up tap hard-drops. Recognize hard drop on up release so holding up+button for 500 ms can open the pause menu without dropping.
 - Provide Resume, New Game, Sound, and Exit in the pause menu. Apply edge detection and horizontal repeat: immediate movement, then 200 ms delay and 60 ms repeat.
 - Use VIA Timer 1 for nonblocking PB7 tones and Timer 2 for a rearmed 100 Hz IRQ tick. Advance an original single-voice melody and effects in a short assembly handler; effects temporarily interrupt the melody. This timer split follows the [VIA datasheet](https://www.westerndesigncenter.com/wdc/documentation/w65c22.pdf).
-- Save five numeric high scores and the sound setting in `/tetris.dat`, using two alternating checksummed records. Missing or corrupt saves use defaults; save failures remain recoverable.
+- Save five numeric high scores and the sound setting in `/tetris.dat`, using two alternating checksummed records in separate 512-byte sectors. Missing or corrupt saves use defaults; save failures remain recoverable.
 
 ## Validation and acceptance
 
 - Build BIOS, extension, game, and diagnostics through standalone Make/CMake entry points. Check module bounds, ABI versions, checksums, stack usage, and ROM address allocation.
 - Test bootstrap loading with missing files, invalid metadata, bad checksums, oversized modules, and CF failures.
 - Use `../microlind-sim/build/microlind-sim-cli` for automated execution of the actual BIOS and RAM-module assembly against disposable disk images. Retain physical board checks for the real peripheral timing and CF interface.
-- Verify assembly filesystem operations on your board before beginning gameplay implementation. Use host-generated fixtures for every supported block size, then inspect target-modified images with the existing host library.
+- Verify assembly filesystem operations on your board when hardware is available. The user has authorized continuing game implementation with simulator validation while this hardware milestone is deferred. Use host-generated fixtures for every supported block size, then inspect target-modified images with the existing host library.
 - Cover adjacent growth, relocation growth, exhausted space, partial-sector writes, zero-filled gaps, nested directories, rename conflicts, and empty/nonempty directory removal.
 - Host-test the same C gameplay logic for rotations, collisions, drops, consecutive line clears, scoring, progression, and top-out.
 - On the complete board, verify joystick repeat/chords, responsive gameplay during music, display updates, persistence across restart, and repeated game/console entry and exit.
@@ -52,14 +52,16 @@ The BIOS will load `/biosfs.mlp` and `/tetris.mlp` from MLFS partition 0. Filesy
 
 ## Next stages
 
-The board checkpoint remains required: on continuation, the user confirmed that
-the hardware checks have not yet been run and asked to keep this checkpoint.
+Physical board checks remain required for hardware acceptance. The user has now
+explicitly deferred this checkpoint and authorized continuing implementation
+using host and simulator checks. This supersedes the earlier sequencing gate;
+it does not mark the board milestone complete.
 Follow [the board acceptance guide](filesystem_board_acceptance.md) for the
 build/image commands, terminal sequence, and pending result table. Prepare all
 eight block-size images before the hardware session; preparation does not mark
 the board milestone complete.
 
-After successful board validation, implement the game in these increments:
+Implement the game in these increments, retaining the deferred hardware checks:
 
 1. **Portable rules and tests.** Add `bios/modules/tetris/` with a C board and
    piece model, deterministic seven-piece bag, movement/rotation, immediate
@@ -93,8 +95,9 @@ After successful board validation, implement the game in these increments:
 5. **Persistence and complete integration.** Encode two fixed-size save records
    explicitly, with version, sequence, five 32-bit scores, sound setting, and
    checksum. Read both and select the newest valid record; write only the other
-   slot and check the transferred count. Keep the earlier valid record usable
-   after an interrupted save. Add corrupt/missing/truncated-save and write-error
+   slot, check the transferred count, and verify all bytes by readback. Place
+   records in separate CF sectors so writing one does not rewrite the other.
+   Retain MLFS’s non-journaled model; do not claim power-loss atomicity. Add corrupt/missing/truncated-save and write-error
    tests through the actual filesystem wrappers. Finish the BIOS launch/menu
    path while checking the remaining ROM space, then run the complete physical
    game acceptance checks listed above.
@@ -122,8 +125,10 @@ Started on branch `fix-filesystem_tetris`.
 - [x] Add shared assembly/C interfaces, CMOC bridges, a serial console, and a host-library development image builder.
 - [x] Add filesystem writes, growth, creation/deletion, rename/move, mkdir/rmdir, and mutation diagnostics.
 - [x] Prepare the board acceptance guide and eight block-size CF images with an artifact checksum manifest.
-- [ ] Verify CF and filesystem operations on the board before game implementation.
-- [ ] Implement and validate the C game, rendering, music, and persistence.
+- [ ] Verify CF and filesystem operations on the board (deferred by the user).
+- [x] Implement portable C rules and run shared host/CMOC regression tests.
+- [x] Implement and simulator-validate the C game, rendering, music, and persistence.
+- [ ] Complete physical game acceptance (display, timing, controls, sound, and persistence).
 
 The foundation and read-only bootstrap loader have been assembled,
 host-validated, and executed in the HD6309 simulator. `make -C bios test-sim`
@@ -151,17 +156,18 @@ built CLI and the saved positive/negative sign-extension probe. The C ABI
 diagnostic now uses ordinary C comparisons without the emulator workaround.
 Menu text was compacted to fit the loader in ROM while retaining the utilities.
 No BIOS has been flashed and no physical CF device has been read or written
-during this work. The next milestone is physical board validation: use the
+during this work. The deferred hardware milestone is physical board validation: use the
 built BIOS/development image, select menu 7, run `t` twice, confirm both
 `FS diagnostic PASS (allocation balanced)` messages, then `q` back to BIOS.
-Physical board validation still precedes gameplay implementation.
+Physical board validation is now deferred while gameplay implementation proceeds
+with the user's authorization.
 
 The prepared `bios/build/board-acceptance/` bundle contains `bios.ihex`,
 `biosfs.mlp`, `fsdiag.mlp`, eight `cf-<block-bytes>.img` fixtures, an explicit
 serial-only simulator config, and `SHA256SUMS`. Both partitions and all bundled module/sample file contents have
 been read back with the production host MLFS library. All artifact
 hashes and the copied ROM layout pass validation. The user confirmed that
-physical checks are still pending; no gameplay code has been started.
+physical checks are still pending. Portable gameplay development has now begun.
 
 A reported simulator menu-entry problem exposed a serial input edge case:
 after CRLF input, the remaining LF became the first byte of the next menu
@@ -190,3 +196,56 @@ Current validation passes 14 host tool tests, 18 BIOS simulator groups, and
 and console mutation commands. The standalone SEX check also passes. Make
 and CMake produce identical `biosfs.mlp` and `fsdiag.mlp` packages. The generated
 `bios/build/cf.img` includes both modules and the separate diagnostics partition.
+
+
+## Game milestone
+
+The user created commit `4f1145d` (`CF done`) to mark the start of gameplay.
+Game implementation follows that baseline and remains uncommitted for review.
+All five implementation increments above are now complete with host and
+simulator validation; physical filesystem and game acceptance remain pending.
+
+`bios/modules/tetris/` contains the portable rules, input timing, and explicit
+save-record codec, plus the CMOC application and assembly entry/platform layer.
+Menu **8** initializes the filesystem and runs `/tetris.mlp`; console **g**
+launches it and remounts the console’s previously selected partition afterward.
+The original BIOS jump-table indices are preserved. The game launcher and its
+message use spare reset-page ROM. The checked BIOS emits 6,786 bytes and leaves
+25 bytes below the I/O window; reset code ends at `$FF35`, before the vectors.
+
+The application renders colored blocks, preview, scores, level, lines, and a
+pause menu. It supports the agreed joystick gestures and additional serial
+A/D/S/W/Space/P/N/M/Q controls. Caching unchanged numbers, preview, and menu
+text avoids delaying input during ordinary piece movement. The assembly IRQ
+advances the tick and original melody/effects while the main loop handles game
+logic, display, and filesystem operations.
+
+The save codec uses two 64-byte records at offsets 0 and 512, with independent
+checksums, wrapping sequence numbers, five 32-bit scores, and sound state.
+The development image preallocates a 1,024-byte file. The game writes and
+verifies the inactive record, keeps session state on failure, and recovers
+from a missing file or corrupt/truncated record. Separate sectors keep an
+ordinary partial-sector update from rewriting the earlier record. Filesystem
+and CF power-loss behavior still require hardware investigation.
+
+Shared portable tests pass **942 rules checks** and **1,033 input/save checks**
+with both the host compiler and CMOC running on the HD6309. Ten integration groups
+cover complete launch/display/control/audio/return, tick
+wraparound, persistence/restart, damaged records, missing-save creation,
+read-only media failure, absent VDC, busy timer refusal, all eight image block sizes with a 1 MB
+sample, and console partition restoration with
+two subsequent diagnostic runs. The lower 512 bytes of the 1 KB BIOS stack
+remain untouched by canaries through the tested gameplay and save paths.
+The packaged application has 10,537 initialized payload bytes, and its link
+map ends at `$31F1`, leaving 3,599 bytes before the `$4000` boundary.
+
+Use [the game README](../bios/modules/tetris/README.md) for build and controls,
+and [the VDC-enabled config](../bios/tests/simulator/tetris.cfg) with the current
+`bios/build/bios.ihex` and `bios/build/tetris-dev.img`. The older filesystem
+board-acceptance bundle remains a separate pending hardware checkpoint.
+
+Final checks also pass the existing 14 host tool tests, 18 BIOS simulator
+groups, and 24 filesystem groups. Standalone CTest passes, and Make/CMake
+produce identical BIOS, filesystem, diagnostic, game, and portable test modules.
+The tracked VDC config has been exercised against a private copy of the current
+development image; `bios/build/tetris-preview.png` captures the actual display.
