@@ -10,10 +10,10 @@ HOOK_TRAP:
     jmp HANG    
 
 HOOK_FIRQ:
-    ; jmp FIRQ_HANDLER
+    rti                         ; FIRQ remains unused; do not dispatch IRQ hooks.
 
 HOOK_IRQ:
-    ; jmp IRQ_HANDLER
+    jmp [BIOS_MODULE_IRQ_VECTOR]
 
 HOOK_SWI3:
     ; jmp SYS_CALL_HANDLER
@@ -60,6 +60,8 @@ INIT:
 
     ; Clear all registers
     jsr CLEAR_REGS
+    ldx #PARALLEL_IRQ_HANDLER
+    stx BIOS_MODULE_IRQ_VECTOR
 
     ; Initialize the VIA and play a power-on tone before choosing a console.
     jsr PARALLEL_INIT
@@ -180,32 +182,16 @@ VDC_FONT_LOADING_MESSAGE:
 msg_mem_detect:
     fcc "Detected RAM chips: "
     fcb 0
-msg_vdc_present:
-    fcc " * MOS 8568 VDC detected; BIOS menu output enabled."
-    fcb 10,13,0
-
-msg_no_vdc:
-    fcc " * No MOS 8568 VDC detected; using serial menu output."
-    fcb 10,13,0
-
-msg_cf_present:
-    fcc " * CompactFlash card detected and initialized."
-    fcb 10,13,0
-
-msg_no_cf:
-    fcc " * No CompactFlash card detected or initialization failed."   
-    fcb 10,13,0
-
 msg_line_break:
-    fcb 10,13,0
-
-; Kept in the reset-vector ROM area to leave driver code below the I/O window.
-msg_prompt0: fcc "  Press a number to continue... "
     fcb 10,13,0
 
 ; -----------------------------------------------------------------
 ; Vector table for the CPU
 ; -----------------------------------------------------------------
+BIOS_RESET_END:
+    ifgt BIOS_RESET_END-$FFF0
+        error "BIOS reset code overlaps CPU vectors"
+    endc
     org $FFF0
 
 V_TRAP: fdb HOOK_TRAP

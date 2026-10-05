@@ -103,7 +103,7 @@ MAIN_MENU:
     jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_line2
     jsr BIOS_CONSOLE_PRINT_A
-    lda VDC_COLOR_WHITE
+    lda #VDC_COLOR_WHITE
     jsr VDC_SET_FOREGROUND_COLOR
     ldx #msg_text1
     jsr BIOS_CONSOLE_PRINT_A
@@ -116,6 +116,8 @@ MAIN_MENU:
     ldx #msg_text5
     jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_text6
+    jsr BIOS_CONSOLE_PRINT_A
+    ldx #msg_text7
     jsr BIOS_CONSOLE_PRINT_A
     ldx #msg_line3
     jsr BIOS_CONSOLE_PRINT_A
@@ -144,6 +146,8 @@ MAIN_MENU:
     beq BOOT_MLOS
     cmpa #'6'
     beq GRAPHIC_INIT
+    cmpa #'7'
+    beq LOAD_FILESYSTEM
     cmpa #'0'
     beq EXIT_MENU
     lbra MAIN_MENU
@@ -174,6 +178,10 @@ WOZMON:
 
 GRAPHIC_INIT:
     jsr GRAPHICS
+    lbra MAIN_MENU
+
+LOAD_FILESYSTEM:
+    jsr BIOS_LOAD_FS_UTIL
     lbra MAIN_MENU
 
 EXIT_MENU:
@@ -397,11 +405,23 @@ BOOT_MLOS_UTIL:
     jsr CF_READ_SECTOR_BUFFER
     bcs BOOT_MLOS_FAIL
 
-    ; Jump to the start of the loaded sector.
+    ; MLFS sector zero is a partition table, never an executable.
+    ldd STORAGE_BUFFER_START
+    cmpd #$4D4C
+    bne BOOT_MLOS_RAW
+    ldd STORAGE_BUFFER_START+2
+    cmpd #$5054
+    beq BOOT_MLOS_MLPT
+BOOT_MLOS_RAW:
+    ; Jump to the start of a legacy raw boot sector.
     jmp STORAGE_BUFFER_START
 
+BOOT_MLOS_MLPT:
+    ldx #msg_boot_mlpt
+    bra BOOT_MLOS_REPORT
 BOOT_MLOS_FAIL:
     ldx #msg_boot_mlos_fail
+BOOT_MLOS_REPORT:
     jsr SERIAL_PRINT_A
     jsr SERIAL_PRINT_CRLF_A
     puls a,b,x,y,u,pc
@@ -430,44 +450,24 @@ GRAPHICS_FAIL:
     clr CONFIG_VDC_PRESENT_FLAG
     rts
 
-; String table
-; -----------------------------------------------------------------
-; 40 col        |                                       |
-
-; msg_line0: fcn "╒═══════════════════════════════════════╕"
-; msg_line1: fcn "│                                       │"
-; msg_line2: fcn "╞═══════════════════════════════════════╡"
-; msg_line3: fcn "╘═══════════════════════════════════════╛"
-; msg_text0: fcn "│    »»» µLind BIOS Utility Menu «««    │"
-; msg_text1: fcn "│ 1. RAM Test                           │"
-; msg_text2: fcn "│ 2. Serial Test                        │"
-; msg_text3: fcn "│ 3. Memory Dump                        │"
-; msg_text4: fcn "│ 4. Joystick Test                      │"
-; msg_text5: fcn "│ 5. Boot MLOS from CF                  │"
-; msg_text6: fcn "│ 6. Initialize Graphics                │"
-; msg_prompt0: fcn "  Press a number to continue... "
-
-msg_line0: fcc "+---------------------------------------+"
+; Compact menu text leaves ROM space for the MLFS bootstrap reader.
+msg_line0:
+msg_line2:
+msg_line3: fcc "+-------------------------+"
            fcb 10,13,0
-msg_line1: fcc "*                                       *"
+msg_text0: fcc "microLind BIOS Utilities"
            fcb 10,13,0
-msg_line2: fcc "+---------------------------------------+"
+msg_text1: fcc "1. RAM Test"
            fcb 10,13,0
-msg_line3: fcc "+---------------------------------------+"
+msg_text2: fcc "2. Serial Test"
            fcb 10,13,0
-msg_text0: fcc "*  --- microLind BIOS Utility Menu ---  *"
+msg_text3: fcc "3. Memory Dump"
            fcb 10,13,0
-msg_text1: fcc "* 1. RAM Test                           *"
+msg_text4: fcc "4. Joystick Test"
            fcb 10,13,0
-msg_text2: fcc "* 2. Serial Test                        *"
+msg_text5: fcc "5. Boot MLOS from CF"
            fcb 10,13,0
-msg_text3: fcc "* 3. Memory Dump                        *"
-           fcb 10,13,0
-msg_text4: fcc "* 4. Joystick Test                      *"
-           fcb 10,13,0
-msg_text5: fcc "* 5. Boot MLOS from CF                  *"
-           fcb 10,13,0
-msg_text6: fcc "* 6. Initialize Graphics                *"
+msg_text6: fcc "6. Initialize Graphics"
            fcb 10,13,0
 
 msg_init0: fcc "microLind BIOS Utility Menu"
@@ -511,6 +511,8 @@ msg_joystick2_input: fcc "Joystick 2 input: 0x"
 msg_joystick_test_end: fcc "Joystick test complete."
            fcb 10,13,0
 msg_boot_mlos_start: fcc "Booting MLOS from CompactFlash..."
+           fcb 10,13,0
+msg_boot_mlpt: fcc "MLFS card: file boot required."
            fcb 10,13,0
 msg_boot_mlos_fail: fcc "Failed to boot MLOS from CF!"
            fcb 10,13,0

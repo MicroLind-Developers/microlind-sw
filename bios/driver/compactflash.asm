@@ -39,6 +39,7 @@ CF_STATUS_RDY           EQU     $40
 CF_STATUS_BUSY          EQU     $80
 
 CF_CMD_READ_SECTOR      EQU     $20
+CF_CMD_WRITE_SECTOR     EQU     $30
 
 CF_LBA_MASTER           EQU     $E0
 CF_WAIT_TIMEOUT         EQU     $FFFF
@@ -109,20 +110,34 @@ CF_READ_SECTOR_BUFFER:
 
 CF_READ_SECTOR:
         pshs    y,u
-        leas    -4,s
+        leas    -5,s
         stq     0,s
+        lda     #CF_CMD_READ_SECTOR
+        bra     _CF_TRANSFER
 
-        jsr     CF_WAIT_READY
-        bcs     _CF_READ_DONE
+; -----------------------------------------------------------------
+; CF_WRITE_SECTOR
+; In: Q = LBA28, X = source buffer containing exactly 512 bytes.
+; Out: C clear, A=CF_OK; C set, A=error code. Preserves Y,U and W.
+; Clobbers A,X,CC. Waits for command completion after the data transfer.
+; Uses the same byte-wide PIO configuration as CF_READ_SECTOR.
+; -----------------------------------------------------------------
+CF_WRITE_SECTOR:
+        pshs    y,u
+        leas    -5,s
+        stq     0,s
+        lda     #CF_CMD_WRITE_SECTOR
 
+_CF_TRANSFER:
+        sta     4,s
+        ; Reject out-of-range addresses before touching command registers.
         lda     0,s
         anda    #$F0
-        beq     _CF_READ_LBA_OK
-        lda     #CF_ERR_DEVICE
-        orcc    #$01
-        bra     _CF_READ_DONE
+        bne     _CF_TRANSFER_BAD_LBA
 
-_CF_READ_LBA_OK:
+        jsr     CF_WAIT_READY
+        bcs     _CF_TRANSFER_DONE
+
         lda     #$01
         sta     CF_SECTOR_COUNT
         lda     3,s
@@ -136,24 +151,37 @@ _CF_READ_LBA_OK:
         ora     #CF_LBA_MASTER
         sta     CF_DRIVE_HEAD
 
-        lda     #CF_CMD_READ_SECTOR
+        lda     4,s
         sta     CF_COMMAND
 
         jsr     CF_WAIT_DRQ
-        bcs     _CF_READ_DONE
+        bcs     _CF_TRANSFER_DONE
 
         ldy     #STORAGE_BUFFER_SIZE
+        lda     4,s
+        cmpa    #CF_CMD_WRITE_SECTOR
+        beq     _CF_WRITE_LOOP
 _CF_READ_LOOP:
         lda     CF_DATA
         sta     ,x+
         leay    -1,y
         bne     _CF_READ_LOOP
+        bra     _CF_TRANSFER_COMPLETE
+_CF_WRITE_LOOP:
+        lda     ,x+
+        sta     CF_DATA
+        leay    -1,y
+        bne     _CF_WRITE_LOOP
 
-        clra
-        andcc   #$FE
+_CF_TRANSFER_COMPLETE:
+        jsr     CF_WAIT_COMPLETE
+        bra     _CF_TRANSFER_DONE
+_CF_TRANSFER_BAD_LBA:
+        lda     #CF_ERR_DEVICE
+        orcc    #$01
 
-_CF_READ_DONE:
-        leas    4,s
+_CF_TRANSFER_DONE:
+        leas    5,s
         puls    y,u,pc
 
 ; -----------------------------------------------------------------
@@ -235,6 +263,24 @@ _CF_WDRQ_NEXT:
 
 _CF_WDRQ_DEVICE_ERROR:
         lda     #CF_ERR_DEVICE
+        orcc    #$01
+        rts
+
+; Wait for both BSY and DRQ to clear; RDY alone is not write completion.
+CF_WAIT_COMPLETE:
+        ldu     #CF_WAIT_TIMEOUT
+_CF_COMPLETE_LOOP:
+        lda     CF_STATUS
+        bita    #CF_STATUS_BUSY
+        bne     _CF_COMPLETE_NEXT
+        bita    #CF_STATUS_ERR|CF_STATUS_DF
+        bne     _CF_WDRQ_DEVICE_ERROR
+        bita    #CF_STATUS_DRQ
+        beq     _CF_WAIT_OK
+_CF_COMPLETE_NEXT:
+        leau    -1,u
+        bne     _CF_COMPLETE_LOOP
+        lda     #CF_ERR_TIMEOUT
         orcc    #$01
         rts
 

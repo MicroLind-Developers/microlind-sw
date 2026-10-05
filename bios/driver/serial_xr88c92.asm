@@ -189,6 +189,9 @@ INP0:
         anda #$01
         beq INP0
         lda SERIAL_RXA
+        ; CR ends a line; discard LF so CRLF cannot prefix the next command.
+        cmpa #$0a
+        beq INP0
         cmpr y,x
         beq INP3
         cmpa #$7f

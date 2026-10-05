@@ -75,4 +75,12 @@ AUDIO_DRIVER_RAM_START          EQU VIDEO_DRIVER_RAM_START+VIDEO_DRIVER_RAM_SIZE
 AUDIO_DRIVER_RAM_SIZE           EQU 32
 AUDIO_BUFFER_START 	            EQU $C800
 AUDIO_BUFFER_SIZE 	            EQU 1024
+
+; RAM module supervisor state, below the reserved $DC00-$DFFF stack.
+BIOS_MODULE_RAM_START           EQU $D920
+BIOS_MODULE_IRQ_VECTOR          EQU BIOS_MODULE_RAM_START
+BIOS_MODULE_RAM_SIZE            EQU 32
+
+; Read-only bootstrap state: $D940-$D975 (54 bytes).
+; $D976-$DBFF remains available; $DC00-$DFFF is the BIOS stack.
     ENDC
