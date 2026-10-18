@@ -96,7 +96,7 @@ $(BUILD)/fsdiag.srec: modules/diagnostic/diagnostic.c include/filesystem.h $(BUI
 $(BUILD)/fsdiag.mlp: $(BUILD)/fsdiag.srec $(BUILD)/fsdiag_entry.ihex tools/pack_module.py tools/module_format.py tools/image_formats.py
 	$(PYTHON) tools/pack_module.py $< $@ --overlay $(BUILD)/fsdiag_entry.ihex --kind application --memory-size 0x3C00
 
-$(BUILD)/biosfs.ihex: $(FS_SOURCES) Makefile
+$(BUILD)/biosfs.ihex: $(FS_SOURCES) $(wildcard ../mlfs/target/*.asm) Makefile
 	mkdir -p $(BUILD)
 	$(LWASM) -3 -f ihex -Imodules/filesystem --list=$(BUILD)/biosfs.lst --symbol-dump=$(BUILD)/biosfs.sym -o $@ modules/filesystem/filesystem.asm
 

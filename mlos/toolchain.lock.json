@@ -1,0 +1,16 @@
+{
+  "lwasm": "lwasm from lwtools 4.24",
+  "lwlink": "lwlink from lwtools 4.24",
+  "cmoc": "cmoc (cmoc 0.1.98)",
+  "tested_host": {
+    "cmake": "3.28.3",
+    "python": "3.12.3",
+    "cxx": "GNU 13.3.0"
+  },
+  "source_baselines": {
+    "software": "42393d7a77088f3ad5935c6ed710f4505e7e663c",
+    "simulator": "bd0fd7b64c7d2519fc8d25499ea89bd964c2f430",
+    "hardware": "017c4cd0f0aae78c3626594b962fac656d738bb5"
+  },
+  "source_lock": "Build provenance includes the source-tree SHA-256 and dirty status, covering local implementation changes beyond these baseline commits."
+}

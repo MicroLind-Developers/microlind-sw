@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 project(microlind-sw)
 
+# Build the new MLOS base without dependencies on archived prototype paths.
+option(MICROLIND_MLOS_ONLY "Configure only the MLOS S00-S02 targets" OFF)
+if(MICROLIND_MLOS_ONLY)
+    add_subdirectory(mlos)
+    return()
+endif()
+
 # Enable verbose output to show all compile commands
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -92,6 +99,7 @@ add_subdirectory(tests/stage3_test)
 add_subdirectory(tests/start_s2)
 add_subdirectory(tests/c-test)
 add_subdirectory(bios)
+add_subdirectory(mlos)
 add_subdirectory(driver)
 add_subdirectory(wozmon)
 add_subdirectory(srec)

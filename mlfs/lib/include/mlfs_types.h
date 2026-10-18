@@ -53,7 +53,7 @@ typedef struct __attribute__((packed)) {
     uint8_t  minor;            // MLFS_VERSION_MINOR
     uint8_t  patch;            // MLFS_VERSION_PATCH
     uint8_t  log2_block_size;  // must match MLPT entry
-    uint8_t  reserved0;
+    uint8_t  reserved0;        // volume state: 0=clean, 1=dirty (requires offline validation)
 
     uint32_t total_blocks;   // blocks in partition
     uint32_t bitmap_start;   // first block of bitmap (usually 1)

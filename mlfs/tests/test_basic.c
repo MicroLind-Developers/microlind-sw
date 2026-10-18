@@ -176,6 +176,24 @@ START_TEST(test_file_errors)
 }
 END_TEST
 
+START_TEST(test_mount_rejects_dirty_or_unknown_state)
+{
+    uint8_t *sb = g_test_ramdisk.mem + (size_t)g_test_fs.part.start_lba * 512;
+    mlfs_t mounted;
+    const uint8_t states[] = {1, 2, 255, 0};
+    for(size_t i = 0; i < sizeof(states); ++i) {
+        sb[8] = states[i];
+        memset(sb + 45, 0, 4);
+        uint32_t sum = 0;
+        for(size_t j = 0; j < 512; ++j)
+            sum += sb[j];
+        for(size_t j = 0; j < 4; ++j)
+            sb[45 + j] = (uint8_t)(sum >> (24 - 8*j));
+        ck_assert_int_eq(mlfs_mount(&g_test_io, 0, &mounted), states[i] ? -13 : 0);
+    }
+}
+END_TEST
+
 Suite *basic_suite(void)
 {
     Suite *s;
@@ -191,6 +209,7 @@ Suite *basic_suite(void)
     tcase_add_test(tc_core, test_multiple_files);
     tcase_add_test(tc_core, test_partial_io);
     tcase_add_test(tc_core, test_file_errors);
+    tcase_add_test(tc_core, test_mount_rejects_dirty_or_unknown_state);
     suite_add_tcase(s, tc_core);
 
     // Block size tests (no setup/teardown since they manage their own filesystems)

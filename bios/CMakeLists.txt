@@ -40,7 +40,7 @@ add_custom_command(
 )
 add_custom_target(bios ALL DEPENDS "${BIOS_STAMP}")
 add_custom_target(bios-build DEPENDS "${BIOS_STAMP}")
-file(GLOB FS_SOURCES CONFIGURE_DEPENDS modules/filesystem/*.asm include/*.inc)
+file(GLOB FS_SOURCES CONFIGURE_DEPENDS modules/filesystem/*.asm ../mlfs/target/*.asm include/*.inc)
 set(FS_MODULE "${CMAKE_CURRENT_BINARY_DIR}/biosfs.mlp")
 add_custom_command(
     OUTPUT "${FS_MODULE}"

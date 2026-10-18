@@ -27,3 +27,16 @@ ps2_proto_test:
 
 clean:
 	rm -f $(IRQ_OBJ) $(IRQ_BIN) $(PARALLEL_BIN) $(PARALLEL_OBJ) $(PS2_BIN)
+
+.PHONY: mlos mlos-test
+mlos:
+	$(MAKE) -C mlos all
+
+mlos-test:
+	$(MAKE) -C mlos test
+
+.PHONY: mlos-runtime mlos-acceptance
+mlos-runtime:
+	$(MAKE) -C mlos runtime-check
+mlos-acceptance:
+	$(MAKE) -C mlos acceptance runtime-check

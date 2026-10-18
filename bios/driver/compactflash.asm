@@ -162,16 +162,33 @@ _CF_TRANSFER:
         cmpa    #CF_CMD_WRITE_SECTOR
         beq     _CF_WRITE_LOOP
 _CF_READ_LOOP:
+        ifdef CF_NATIVE_TFM
+        pshsw
+        ldw     #STORAGE_BUFFER_SIZE
+        ldy     #CF_DATA
+        tfm     y,x+
+        pulsw
+        bra     _CF_TRANSFER_COMPLETE
+        else
         lda     CF_DATA
         sta     ,x+
         leay    -1,y
         bne     _CF_READ_LOOP
         bra     _CF_TRANSFER_COMPLETE
+        endc
 _CF_WRITE_LOOP:
+        ifdef CF_NATIVE_TFM
+        pshsw
+        ldw     #STORAGE_BUFFER_SIZE
+        ldy     #CF_DATA
+        tfm     x+,y
+        pulsw
+        else
         lda     ,x+
         sta     CF_DATA
         leay    -1,y
         bne     _CF_WRITE_LOOP
+        endc
 
 _CF_TRANSFER_COMPLETE:
         jsr     CF_WAIT_COMPLETE

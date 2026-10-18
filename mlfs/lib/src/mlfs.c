@@ -484,6 +484,11 @@ int mlfs_add_partition(const mlfs_io_t* io, uint32_t start_lba, uint32_t block_c
 // ---- mkfs/mount ----
 int mlfs_mkfs(const mlfs_io_t* io, uint16_t part_index, mlfs_t* out_fs)
 {
+    return mlfs_mkfs_with_root(io, part_index, 2, out_fs);
+}
+
+int mlfs_mkfs_with_root(const mlfs_io_t* io, uint16_t part_index, uint32_t root_blocks, mlfs_t* out_fs)
+{
     if(!io || !out_fs)
         return -1;  // Invalid parameters
     mlpt_t pt;
@@ -515,7 +520,10 @@ int mlfs_mkfs(const mlfs_io_t* io, uint16_t part_index, mlfs_t* out_fs)
     sb.bitmap_blocks =
         (out_fs->bytes_per_block ? ((sb.total_blocks + (out_fs->bytes_per_block * 8u) - 1) / (out_fs->bytes_per_block * 8u)) : 0);
     sb.root_dir_block  = sb.bitmap_start + sb.bitmap_blocks;
-    sb.root_dir_blocks = 2;
+    sb.root_dir_blocks = root_blocks;
+    if (!root_blocks || sb.root_dir_block >= sb.total_blocks ||
+        root_blocks > sb.total_blocks - sb.root_dir_block)
+        return -5;
     uint32_t uuid_temp[4];
     mlfs_fill_uuid(uuid_temp);
     memcpy(sb.uuid, uuid_temp, sizeof(sb.uuid));
@@ -590,6 +598,11 @@ int mlfs_mount(const mlfs_io_t* io, uint16_t part_index, mlfs_t* out_fs)
         return -11;
     if(sb.log2_block_size != part.log2_block_size)
         return -12;
+    // The host library has no read-only mount mode. Never hand its writable
+    // APIs a dirty or unknown-state volume; the offline validator/repair tool
+    // must establish ownership before an explicit repair clears this byte.
+    if(sb.reserved0 != 0)
+        return -13;
     out_fs->sb = sb;
     return 0;
 }

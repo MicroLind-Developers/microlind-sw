@@ -4,3 +4,5 @@
 *.raw
 *.bin
 **/build/
+
+__pycache__/

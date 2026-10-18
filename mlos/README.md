@@ -1,264 +1,166 @@
-# MLOS Implementation Notes
+# MLOS: CF-booted serial system (S00–S09)
 
-MLOS is the Microlind operating system layer. Its job is to provide stable
-kernel services to C programs while hiding BIOS and hardware details behind an
-OS syscall ABI.
+MLOS now boots from MLFS and runs a preemptive HD6309 native-mode kernel,
+assembly and CMOC programs, IPC, asynchronous device requests, filesystem
+services and a serial shell on the 512 KiB target. The original S00–S02 embedded
+harness remains a separate regression image. The previous prototype is in
+`spikes/old_mlos/`.
 
-The current code is a bootable skeleton, not a complete OS.
+The software is exercised with both simulator engines. Physical GAL fit,
+privilege-gate wiring and board timing/CF qualification remain open. See the
+[stage evidence](docs/runtime-stages.md) for the supported profile and remaining
+hardware dependencies; this is not a completed physical K1 qualification.
 
-## Current Structure
+## Build and test
 
-- `src/kernel.asm`
-  Kernel entry point at `MLOS_ORIGIN`, stack initialization, memory manager
-  initialization, and a serial banner through the BIOS jump table.
-
-- `src/syscall_dispatch.asm`
-  First syscall dispatcher. It accepts a syscall number in `A`, arguments in
-  registers, and dispatches to kernel services.
-
-- `src/syscall_c_shim.asm`
-  C-callable wrappers named `_sys_*`. These adapt CMOC stack arguments into the
-  dispatcher register ABI.
-
-- `src/memory_manager.asm`
-  First-stage linear heap with `MEM_MANAGER_SBRK`. This is enough to support a
-  C runtime and later `malloc`.
-
-- `include/mlos.inc`
-  Kernel memory layout and BIOS jump-table constants used by assembly.
-
-- `include/syscall.inc`
-  Assembly syscall numbers and error codes.
-
-- `include/syscalls.h`
-  C-facing syscall API for OS programs.
-
-## Build
-
-Using Make:
+LWTOOLS 4.24 and CMOC 0.1.98 are pinned in
+[toolchain.lock.json](toolchain.lock.json). Host tooling needs Python 3, C/C++20
+and CMake. Rebuild the accompanying simulator changes before running tests:
 
 ```sh
-cd mlos
-make
+cmake -S ../microlind-sim -B /tmp/mlos-sim-build -DMICROLIND_BUILD_GUI=OFF
+cmake --build /tmp/mlos-sim-build -j4
+make -C mlos all SIMULATOR=/tmp/mlos-sim-build/microlind-sim-cli
+make -C mlos acceptance SIMULATOR=/tmp/mlos-sim-build/microlind-sim-cli
 ```
 
-Output:
+An existing GoogleTest checkout can be supplied using
+`-DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=/absolute/path/to/googletest` when network
+access is unavailable. `SIMULATOR` must point to the CLI in its CMake build
+directory, beside `libmicrolind-sim.a` and `libmicrolind-sim-app.a`.
 
-```text
-mlos/build/mlos.ihex
-```
+`all` builds both images and checks their budgets. `acceptance` runs the original
+entry/memory/CMOC checks, runtime contracts, corrupt-boot matrix, full console
+workflow and host image/repair tests. Individual targets are `test`,
+`runtime-test`, `boot-test`, `console-test`, `image-test`, `runtime-check` and
+`session-test` (the GUI session loader/realtime backend).
+Use `BUILD=/tmp/another-build` for an independent build. Acceptance runs its
+suites sequentially because they generate shared runner headers/configuration;
+do not run separate test commands against the same BUILD concurrently.
 
-Using CMake:
+Command latency has a separate opt-in benchmark:
 
 ```sh
-cmake -S mlos -B /tmp/mlos-build
-cmake --build /tmp/mlos-build
+make -C mlos response-profile BUILD=/tmp/mlos-perf-build \
+  SIMULATOR=/tmp/mlos-sim-build/microlind-sim-cli
 ```
 
-## Current Syscall ABI
+It measures UART input, first output, loading, execution and prompt return on
+both engines, using disposable CF copies. Results and instruction profiles go
+under `BUILD/response-profile/`. See the
+[command responsiveness analysis](docs/command-responsiveness.md) for the S09
+baseline, limits and recommended optimization order. The
+[implemented improvements](docs/performance-improvements.md) compare the optimized
+release with that baseline. The benchmark is separate
+from acceptance and does not change runtime code.
 
-The first-stage dispatcher uses this register ABI:
+Root Make targets forward `mlos`, `mlos-test`, `mlos-runtime` and
+`mlos-acceptance`. CMake integration is available without historical prototype
+paths:
+
+```sh
+cmake -S . -B /tmp/mlos-sw-build -DMICROLIND_MLOS_ONLY=ON \
+  -DMLOS_SIMULATOR=/tmp/mlos-sim-build/microlind-sim-cli
+cmake --build /tmp/mlos-sw-build --target mlos-acceptance
+```
+
+## Run the console
+
+`build/boot.ihex` is the production ROM; `build/console.img` is a disposable,
+formatted CF image containing the kernel, init, filesystem services, shell,
+commands and example driver. `build/runtime.cfg` selects 3 MHz, 512 KiB and
+that CF image. The ROM expects partition 0, MLFS 1.1.0 with 512-byte blocks and
+root `mlos.bin`; it does not execute a sector-zero jump stub.
+
+In the GUI, use **File → Load Session** to open `build/mlos.session`. It selects
+the matching ROM, CF image, HD6309 and 3 MHz model/pacing settings together.
+Then choose **True Run**. Alternatively, select HD6309, load this ROM and
+`build/runtime.cfg`, reset, then choose
+**True clock: 3 MHz** and **True Run** in the Control panel. Regular **Run** is
+throttled by **Operations/min** (default 600, only ten instructions/second).
+At that default, the initial 8192-byte RAM clear alone takes about 41 minutes;
+PC cycles through `rboot_clear` while X advances from C000 to E000. The green
+power LED and early serial banner are already visible before clearing begins.
+The configured CPU clock does not override debugger throttling.
+The GUI's True clock setting controls host pacing; it does not change the CPU
+model's `[CPU] CLOCK_HZ`. MLOS requires the configured 3 MHz model for its current
+timer/entry budget. An old session with an implicit 1 MHz model can stall at
+`Loading init.mlx...` with endless dots even when True clock says 3 MHz. Reload
+the corrected hardware configuration/session; Reset alone keeps the loaded model.
+See [the complete boot process and measured phase timings](docs/boot-process.md)
+for reset-to-prompt behavior; this build needs approximately 7.3 simulated seconds
+at 3 MHz before the first prompt.
+
+Boot reports the current stage and installed image on UART A, with periodic dots
+during long loads and filesystem validation. Feedback stops before the shell
+prompt. ROM boot rejection or a core panic turns the power LED red.
+
+```sh
+/tmp/mlos-sim-build/microlind-sim-cli --6309 --ihex \
+  --rom mlos/build/boot.ihex --config mlos/build/runtime.cfg
+```
+
+Use the simulator's serial terminal for interactive input. In the CLI, `run`
+advances execution and `serin` injects bytes; it does not append Enter. The shell
+accepts CR or LF. UART A carries the interactive console; UART B carries logs
+through a separate simulator callback. CLI/debugger commands and shell commands
+are different input paths.
+
+Example shell workflow:
 
 ```text
-A = syscall number
-B = small argument, character, or exit code
-X = arg0 pointer or 16-bit value
-Y = arg1 pointer or 16-bit value
+help
+ps
+mem
+mkdir work
+cd work
+echo 'hello world' > note
+cat note
+cp note copy
+ls
+cat /proc/memory
+cd /
+loadmod delay.mld
 ```
 
-Return convention:
+Commands also include `pwd`, `rm`, `rmdir`, `mv`, `sleep`, `yield`, `mounts`,
+`recover`, `unmount` and `key`. Builtins are `cd`, `exit`, `loadmod` and
+`bindmod`. Single/double quotes and `<`/`>` redirection work. Foreground Ctrl-C
+returns input to the shell after safe cancellation. Pipes, background command
+syntax, append, expansion and GUI startup are later-stage features.
 
-```text
-D or X = return value, depending on syscall
-C clear = success
-C set   = failure
-D       = negative SYS_E* error code on failure
-```
+A second polled CF can be explicitly configured at F640–F647 using a `[CF2]`
+section; `recover /disk1` starts its worker. The console acceptance suite
+constructs two disposable images/configuration and exercises this path. This
+address is a manual simulator binding, not a qualified expansion-card contract.
 
-Current syscall numbers:
+## Source and artifact boundaries
 
-```text
-SYS_EXIT        0
-SYS_PUTC        1
-SYS_GETC        2
-SYS_WRITE       3
-SYS_READ        4
-SYS_SBRK        5
-SYS_TICKS       6
-SYS_BLOCK_READ  7
-SYS_BLOCK_WRITE 8
-SYS_OPEN        9
-SYS_CLOSE       10
-SYS_READ_FD     11
-SYS_WRITE_FD    12
-SYS_SEEK        13
-```
+| Location | Responsibility |
+| --- | --- |
+| `bios/mlos/` | Fixed ROM entry/return, reset, vectors, UART/timer, CF boot and restricted immutable-image provider |
+| `mlos/src/` | Shared entry ABI, safe copies, frame ownership/handles, original harness |
+| `mlos/runtime/` | Scheduler/processes, heap, IPC/waits, driver requests/modules, TTY and namespace metadata |
+| `mlos/services/` | Unprivileged filesystem frontend and per-drive workers |
+| `mlos/programs/`, `mlos/modules/` | Init, shell, commands, diagnostic programs and trusted example module |
+| `mlos/sdk/`, `mlos/include/` | CMOC startup/runtime, filesystem/terminal clients, generated ABI and layouts |
+| `mlfs/target/` | Shared target filesystem algorithms, also included by the legacy BIOS filesystem module |
+| `mlfs/lib/`, `mlfs/tools/` | Production host filesystem library and offline validation/repair |
+| `mlos/tests/`, `mlos/tools/` | Actual-target runners, deterministic CF construction, packers, budgets and provenance |
 
-Currently implemented:
+The legacy menu BIOS remains an independent build. Runtime services are outside
+the 8 KiB ROM. Ordinary file access goes through the filesystem service; the
+restricted ROM reader remains solely for installed executable/module images.
+Those filenames are immutable while running and require offline installation.
 
-- `SYS_EXIT`
-- `SYS_PUTC`
-- `SYS_WRITE`
-- `SYS_READ`
-- `SYS_SBRK`
-- `SYS_TICKS`, currently returns zero
+Each BUILD retains symbols/listings, `budget.json`, `runtime-budget.json`,
+`provenance.json`, pristine images, disposable test images and suite logs.
+`provenance.json` records tool versions/options, three repository revisions and
+source hashes, simulator binary hash and target image hashes. Host fixtures use
+deterministic metadata. `console.img` is pristine; tests modify copies.
 
-Currently reserved but not implemented:
-
-- `SYS_GETC`
-- block I/O
-- file I/O
-
-## C Usage
-
-Kernel-linked C code can include:
-
-```c
-#include "syscalls.h"
-```
-
-Example:
-
-```c
-void app_main(void)
-{
-    sys_write("hello from MLOS\r\n", 17);
-    sys_putc('>');
-    sys_sbrk(64);
-}
-```
-
-The C wrappers are in `src/syscall_c_shim.asm`. They are normal link symbols,
-not ROM BIOS calls.
-
-## Implementation Roadmap
-
-### 1. Make Console I/O Counted
-
-`SYS_WRITE` currently treats `X` as a NUL-terminated string and ignores `Y`.
-The public C prototype is already:
-
-```c
-int16_t sys_write(const void *buf, uint16_t len);
-```
-
-Next step: implement counted writes so binary buffers and strings with embedded
-zero bytes work correctly.
-
-Suggested dispatcher behavior:
-
-```text
-X = buffer
-Y = length
-return D = bytes written
-```
-
-### 2. Add Blocking Character Input
-
-Implement `SYS_GETC` on top of the BIOS serial input path or a BIOS serial
-character-read routine.
-
-Suggested behavior:
-
-```text
-return D = character in low byte
-```
-
-Add a non-blocking variant later if needed.
-
-### 3. Wire Timer Ticks
-
-`SYS_TICKS` should return a monotonic counter updated from IRQ/FIRQ timer code.
-
-Needed pieces:
-
-- timer initialization during `MLOS_START`
-- IRQ/FIRQ vector ownership
-- a kernel RAM tick counter
-- atomic read of the counter in `SYS_TICKS`
-
-### 4. Replace Linear Heap with Page Management
-
-The current memory manager is deliberately simple:
-
-```text
-MLOS_HEAP_START = $9000
-MLOS_HEAP_END   = $BFFF
-```
-
-Keep `SYS_SBRK` stable, but internally move toward:
-
-- detected physical memory banks
-- bitmap of 256-byte pages or larger pages
-- reserved kernel pages
-- user/process allocation regions
-- bank mapping ownership
-
-### 5. Add Block Device Syscalls
-
-Implement:
-
-```c
-int16_t sys_block_read(uint32_t lba, void *buf);
-int16_t sys_block_write(uint32_t lba, const void *buf);
-```
-
-Use fixed 512-byte sectors for CompactFlash. Keep block I/O separate from file
-I/O so MLFS can be developed and tested independently.
-
-### 6. Mount MLFS in the Kernel
-
-After block I/O works, add MLFS-backed file syscalls:
-
-```c
-int16_t sys_open(const char *path, uint8_t flags);
-int16_t sys_close(int16_t fd);
-int16_t sys_read_fd(int16_t fd, void *buf, uint16_t len);
-int16_t sys_write_fd(int16_t fd, const void *buf, uint16_t len);
-int16_t sys_seek(int16_t fd, uint32_t pos);
-```
-
-Start with a small fixed file descriptor table in kernel RAM.
-
-### 7. Define Program Loading
-
-Before multitasking, define a simple program loading convention:
-
-- load address
-- initial stack
-- argument block format
-- return path to shell
-- which MMU banks belong to the program
-
-Then implement `SYS_EXIT` as return-to-shell instead of halt.
-
-### 8. Add Process State Later
-
-Do not start with full multitasking. First make one program run reliably.
-
-Later process state should include:
-
-- saved registers
-- stack pointer
-- MMU bank map
-- open file descriptors
-- process state flags
-
-## Design Rules
-
-- User programs call MLOS syscalls, not BIOS directly.
-- MLOS can call BIOS during early bring-up.
-- Keep syscall numbers stable once programs depend on them.
-- Return negative errors consistently.
-- Prefer adding new syscalls over changing argument meaning.
-- Keep hardware-specific names out of `syscalls.h`.
-
-## Near-Term Work Items
-
-Recommended next commits:
-
-1. Convert `SYS_WRITE` to counted buffer output.
-2. Add `SYS_GETC`.
-3. Add a small `examples/hello.c` that links against `syscall_c_shim.asm`.
-4. Fix BIOS build files so the BIOS jump table image is reproducible.
-5. Add block read/write around `compactflash.asm`.
+The [runtime contracts](docs/runtime.md) freeze image/driver/filesystem/TTY
+formats and resource limits. The [original entry contracts](docs/contracts.md),
+[original S00–S02 evidence](docs/stages.md) and
+[hardware profile](docs/hardware.md) retain the foundation and physical checklist.
+The three documents in `plans/` remain the architectural authority.

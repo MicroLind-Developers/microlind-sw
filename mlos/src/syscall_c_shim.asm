@@ -1,69 +1,46 @@
-; -----------------------------------------------------------------
-; C-callable MLOS syscall shims
-; -----------------------------------------------------------------
-; These wrappers are for code linked with the kernel/runtime. They adapt
-; CMOC-style stack arguments to MLOS_SYSCALL_DISPATCH.
-; -----------------------------------------------------------------
+    include "syscalls.inc"
+    section code
+    export _mlos_call
+; Function: _mlos_call — CMOC stack arguments to native SWI v1.
+; Inputs: [S+2..3]=promoted u16 call number, [S+4..5]=parameter pointer.
+; Outputs: D=raw result/error; C as syscall. Clobbers: D,CC. Preserves: X,Y,U,
+; E,F,V,DP,MD. Stack: 4 wrapper +14 hardware + core common stack.
+; Context: native application, recorded maps. Copies/ownership/blocking follow
+; the chosen syscall. No compiler-dependent binary structures cross the ABI.
+_mlos_call:
+    pshs x
+    lda 4,s
+    bne mlos_c_invalid
+    lda 5,s
+    ldx 6,s
+    swi
+    puls x,pc
+mlos_c_invalid:
+    ldd #SYS_EINVAL
+    orcc #1
+    puls x,pc
+    endsection
 
-    IFNDEF MLOS_SYSCALL_INC
-        include "../include/syscall.inc"
-    ENDC
-
-; void sys_exit(uint8_t code)
-_sys_exit:
-    pshs u
-    tfr s,u
-    lda #SYS_EXIT
-    ldb 2,u
-    jsr MLOS_SYSCALL_DISPATCH
-    puls u,pc
-
-; int16_t sys_putc(uint8_t ch)
-_sys_putc:
-    pshs u
-    tfr s,u
-    lda #SYS_PUTC
-    ldb 2,u
-    jsr MLOS_SYSCALL_DISPATCH
-    puls u,pc
-
-; int16_t sys_getc(void)
-_sys_getc:
-    lda #SYS_GETC
-    jsr MLOS_SYSCALL_DISPATCH
+    section code
+    export _mlos_argc,_mlos_argv
+; Function: _mlos_argc / _mlos_argv. Inputs initialized SDK startup words.
+; Outputs D=argc/argv; clobbers D,CC; preserves all other registers; stack2.
+_mlos_argc:
+    ldd $0300
     rts
-
-; int16_t sys_write(const void *buf, uint16_t len)
-_sys_write:
-    pshs u
-    tfr s,u
-    lda #SYS_WRITE
-    ldx 2,u
-    ldy 4,u
-    jsr MLOS_SYSCALL_DISPATCH
-    puls u,pc
-
-; int16_t sys_read(void *buf, uint16_t len)
-_sys_read:
-    pshs u
-    tfr s,u
-    lda #SYS_READ
-    ldx 2,u
-    ldy 4,u
-    jsr MLOS_SYSCALL_DISPATCH
-    puls u,pc
-
-; void *sys_sbrk(int16_t delta)
-_sys_sbrk:
-    pshs u
-    tfr s,u
-    lda #SYS_SBRK
-    ldx 2,u
-    jsr MLOS_SYSCALL_DISPATCH
-    puls u,pc
-
-; uint32_t sys_ticks(void)
-_sys_ticks:
-    lda #SYS_TICKS
-    jsr MLOS_SYSCALL_DISPATCH
+_mlos_argv:
+    ldd $0302
     rts
+    endsection
+
+    section code
+    export _mlos_put_u16
+; Function: _mlos_put_u16. Inputs C stack promoted pointer/value words. Outputs
+; stores a big-endian word. Clobbers D,CC; preserves X,Y,U,W,V,DP; stack<=4.
+_mlos_put_u16:
+    pshs x
+    ldx 4,s
+    ldd 6,s
+    std ,x
+    puls x,pc
+    endsection

@@ -50,6 +50,10 @@ int mlfs_add_partition(const mlfs_io_t* io, uint32_t start_lba, uint32_t block_c
 
 // Format & mount
 int mlfs_mkfs(const mlfs_io_t* io, uint16_t part_index, mlfs_t* out_fs);
+/* Explicit root capacity, in filesystem blocks; existing formatter defaults to two. */
+int mlfs_mkfs_with_root(const mlfs_io_t* io, uint16_t part_index, uint32_t root_blocks, mlfs_t* out_fs);
+// Writable host mounts require clean superblock state; -13 means dirty/unknown.
+// Use tools/check_image.py for explicit offline validation and supported repair.
 int mlfs_mount(const mlfs_io_t* io, uint16_t part_index, mlfs_t* out_fs);
 
 // Simple allocator & file ops (root only; single-extent files)
